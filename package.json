@@ -1,0 +1,62 @@
+{
+  "name": "lycon-browser",
+  "version": "1.0.0",
+  "description": "Lycon \u2014 Privacy-first web browser. A fierce wolf-themed browser with ad/tracker blocking, multi-tab browsing, bookmarks, history, downloads, and private mode. Built on Electron (desktop), WinUI 3 + WebView2 (Windows), and Kotlin + GeckoView (Android).",
+  "type": "module",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build": "electron-builder -mwl"
+  },
+  "dependencies": {
+    "@cliqz/adblocker-electron": "^1.27.0"
+  },
+  "devDependencies": {
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.lycon.browser",
+    "productName": "Lycon",
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "src/**/*",
+      "build/**/*"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    }
+  },
+  "author": "Uviwe Menyiwe (Azura Daemon), HAEL Foundation (incorporating Lycon Project)",
+  "license": "MPL-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}

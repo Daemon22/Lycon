@@ -1,0 +1,135 @@
+/* ===================================================================
+   Lycon Browser — Theme Variables
+   Manya-integrated: warm earthy palette (gold/teal/sage on brown-black)
+   =================================================================== */
+
+:root {
+  /* Brand — Manya warm palette */
+  --lycon-gold:       #d4a574;
+  --lycon-gold-hover: #f4c430;
+  --lycon-teal:       #38aaa0;
+  --lycon-teal-hover: #5cc4ba;
+  --lycon-sage:       #7fb069;
+  /* Legacy aliases for compatibility */
+  --lycon-orange: var(--lycon-gold);
+  --lycon-orange-hover: var(--lycon-gold-hover);
+  --lycon-purple: var(--lycon-teal);
+  --lycon-purple-hover: var(--lycon-teal-hover);
+  --lycon-pink: var(--lycon-sage);
+
+  /* Dark theme (default) — warm brown-black */
+  --bg-app:        #1a1410;
+  --bg-toolbar:    #221a14;
+  --bg-tabstrip:   #1a1410;
+  --bg-tab:        transparent;
+  --bg-tab-hover:  rgba(212, 165, 116, 0.06);
+  --bg-tab-active: #2a2018;
+  --bg-content:    #1a1410;
+  --bg-sidebar:    #221a14;
+  --bg-input:      #2a2018;
+  --bg-input-focus:#332820;
+  --bg-dropdown:   #2a2018;
+  --bg-modal:      #2a2018;
+
+  --fg-primary:    #f5ede0;
+  --fg-secondary:  #a89a85;
+  --fg-muted:      #6b5f50;
+
+  --border:        rgba(212, 165, 116, 0.10);
+  --border-strong: rgba(212, 165, 116, 0.20);
+
+  --accent: var(--lycon-gold);
+  --accent-hover: var(--lycon-gold-hover);
+  --accent-fg: #1a1410;
+
+  --danger: #e07856;
+  --success: #4caf50;
+  --warning: #f4c430;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-tab: 10px 10px 0 0;
+
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+
+  --tab-h: 36px;
+  --toolbar-h: 44px;
+  --titlebar-h: 36px;
+}
+
+[data-theme="light"] {
+  --bg-app:        #f5f0e8;
+  --bg-toolbar:    #ffffff;
+  --bg-tabstrip:   #ede5d8;
+  --bg-tab:        transparent;
+  --bg-tab-hover:  rgba(0,0,0,0.04);
+  --bg-tab-active: #ffffff;
+  --bg-content:    #ffffff;
+  --bg-sidebar:    #ffffff;
+  --bg-input:      #f5f0e8;
+  --bg-input-focus:#ede5d8;
+  --bg-dropdown:   #ffffff;
+  --bg-modal:      #ffffff;
+
+  --fg-primary:    #1a1410;
+  --fg-secondary:  #4a4035;
+  --fg-muted:      #8a7d6b;
+
+  --border:        rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.16);
+
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.20);
+}
+
+[data-theme="system"] {
+  /* JS will swap to light/dark based on matchMedia */
+}
+
+/* Accent picker overrides — Manya warm palette */
+[data-accent="orange"] { --accent: var(--lycon-gold); --accent-hover: var(--lycon-gold-hover); }
+[data-accent="purple"] { --accent: var(--lycon-teal); --accent-hover: var(--lycon-teal-hover); }
+[data-accent="pink"]   { --accent: var(--lycon-sage); --accent-hover: #9bc47f; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter",
+               "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  background: var(--bg-app);
+  color: var(--fg-primary);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  transition: background 0.15s, color 0.15s, transform 0.05s;
+}
+button:hover:not(:disabled) { background: var(--bg-tab-hover); }
+button:active:not(:disabled) { transform: scale(0.96); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+input {
+  font: inherit;
+  color: inherit;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+input:focus { background: var(--bg-input-focus); border-color: var(--accent); }
+
+.hidden { display: none !important; }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand colors -->
+    <color name="lycon_orange">#FB542B</color>
+    <color name="lycon_purple">#7B2FE3</color>
+    <color name="lycon_pink">#E84393</color>
+
+    <!-- Dark theme (default) -->
+    <color name="bg_app">#1a1625</color>
+    <color name="bg_toolbar">#221c33</color>
+    <color name="bg_input">#2d2542</color>
+    <color name="fg_primary">#f5f3fa</color>
+    <color name="fg_secondary">#b0a8c8</color>
+    <color name="fg_muted">#6e6688</color>
+    <color name="border">#2a2440</color>
+
+    <!-- Status bar / nav bar -->
+    <color name="status_bar_color">#1a1625</color>
+    <color name="nav_bar_color">#0a0712</color>
+</resources>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' lycon-startpage: file:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; connect-src *;" />
+  <title>Lycon</title>
+  <link rel="stylesheet" href="styles/themes.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="styles/tabs.css" />
+</head>
+<body>
+  <!-- ============== Title bar (draggable on macOS hidden inset) ============== -->
+  <header class="titlebar">
+    <div class="titlebar-drag"></div>
+    <div class="titlebar-logo">
+      <img src="./assets/wolf-logo.png" width="22" height="22" alt="Lycon" style="border-radius:4px;" />
+      <span class="titlebar-name">Lycon</span>
+    </div>
+    <div class="titlebar-spacer"></div>
+    <div class="titlebar-actions">
+      <button id="win-min" title="Minimize">—</button>
+      <button id="win-max" title="Maximize">▢</button>
+      <button id="win-close" title="Close">✕</button>
+    </div>
+  </header>
+
+  <!-- ============== Tab strip ============== -->
+  <div class="tabstrip" id="tabstrip">
+    <div class="tabs" id="tabs"></div>
+    <button class="tab-new" id="tab-new" title="New tab (Ctrl+T)">＋</button>
+  </div>
+
+  <!-- ============== Toolbar ============== -->
+  <div class="toolbar">
+    <div class="toolbar-nav">
+      <button id="nav-back" title="Back (Alt+←)" disabled>❮</button>
+      <button id="nav-forward" title="Forward (Alt+→)" disabled>❯</button>
+      <button id="nav-reload" title="Reload (Ctrl+R)">⟳</button>
+      <button id="nav-home" title="Home">⌂</button>
+    </div>
+
+    <div class="urlbar-wrap">
+      <div class="urlbar-security" id="urlbar-security" title="Site information">
+        <svg id="sec-icon-lock" viewBox="0 0 24 24" width="14" height="14" style="display:none;"><path fill="currentColor" d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3H9z"/></svg>
+        <svg id="sec-icon-info" viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/></svg>
+        <svg id="sec-icon-warning" viewBox="0 0 24 24" width="14" height="14" style="display:none;"><path fill="currentColor" d="M12 2 1 21h22L12 2zm0 4 8 14H4l8-14zm-1 4v5h2v-5zm0 6v2h2v-2z"/></svg>
+      </div>
+      <div class="urlbar-shields" id="shields-btn" title="Lycon Shields — ads & trackers blocked">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2 L4 5 V11 C4 16 7 20 12 22 C17 20 20 16 20 11 V5 Z"/></svg>
+        <span class="shields-count" id="shields-count">0</span>
+      </div>
+      <input id="urlbar" class="urlbar" type="text" placeholder="Search or type a URL" autocomplete="off" spellcheck="false" />
+      <button id="urlbar-bookmark" class="urlbar-action" title="Bookmark this page">☆</button>
+    </div>
+
+    <div class="toolbar-actions">
+      <button id="act-downloads" title="Downloads (Ctrl+J)">⬇</button>
+      <button id="act-bookmarks" title="Bookmarks (Ctrl+B)">★</button>
+      <button id="act-history" title="History (Ctrl+H)">🕓</button>
+      <button id="act-private" title="New private tab (Ctrl+Shift+P)">🕶</button>
+      <button id="act-menu" title="Menu">☰</button>
+    </div>
+  </div>
+
+  <!-- ============== Find bar ============== -->
+  <div class="findbar hidden" id="findbar">
+    <input id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
+    <span id="find-count" class="find-count">0/0</span>
+    <button id="find-prev" title="Previous (Shift+Enter)">▲</button>
+    <button id="find-next" title="Next (Enter)">▼</button>
+    <button id="find-close" title="Close (Esc)">✕</button>
+  </div>
+
+  <!-- ============== Content area (webviews) ============== -->
+  <div class="content" id="content"></div>
+
+  <!-- ============== Sidebar panels ============== -->
+  <aside class="sidebar hidden" id="sidebar">
+    <header class="sidebar-header">
+      <h2 id="sidebar-title">Panel</h2>
+      <button id="sidebar-close">✕</button>
+    </header>
+    <div class="sidebar-body" id="sidebar-body"></div>
+  </aside>
+
+  <!-- ============== Menu dropdown ============== -->
+  <div class="menu-dropdown hidden" id="menu-dropdown">
+    <button data-action="new-tab">New Tab<span class="kbd">Ctrl+T</span></button>
+    <button data-action="new-private">New Private Tab<span class="kbd">Ctrl+Shift+P</span></button>
+    <div class="menu-sep"></div>
+    <button data-action="find">Find in Page<span class="kbd">Ctrl+F</span></button>
+    <button data-action="downloads">Downloads<span class="kbd">Ctrl+J</span></button>
+    <button data-action="bookmarks">Bookmarks<span class="kbd">Ctrl+B</span></button>
+    <button data-action="history">History<span class="kbd">Ctrl+H</span></button>
+    <div class="menu-sep"></div>
+    <button data-action="devtools">Toggle DevTools<span class="kbd">F12</span></button>
+    <button data-action="screenshot">Screenshot</button>
+    <div class="menu-sep"></div>
+    <button data-action="settings">Settings</button>
+    <button data-action="about">About Lycon</button>
+  </div>
+
+  <!-- ============== Status bar (hover links) ============== -->
+  <div class="statusbar hidden" id="statusbar"></div>
+
+  <!-- ============== Modal host ============== -->
+  <div class="modal-host hidden" id="modal-host">
+    <div class="modal" id="modal-content"></div>
+  </div>
+
+  <!-- ============== Scripts ============== -->
+  <!-- Bridge MUST load first — it provides window.lycon used by all UI modules -->
+  <script src="bridge/bridge.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/tabs.js"></script>
+  <script src="js/navigation.js"></script>
+  <script src="js/shields.js"></script>
+  <script src="js/bookmarks.js"></script>
+  <script src="js/history.js"></script>
+  <script src="js/downloads.js"></script>
+  <script src="js/private.js"></script>
+  <script src="js/finder.js"></script>
+  <script src="js/sidebar.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/startpage.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
