@@ -45,8 +45,9 @@ Electron (desktop), WinUI 3 + WebView2 (Windows), and Kotlin + GeckoView (Androi
 
 ```
 lycon-browser/
-├── main.js                    # Electron main process
-├── preload.js                 # Electron preload — exposes __lyconNative
+├── main.cjs                   # Electron main process (packaged entry point)
+├── preload.cjs                # Electron preload — exposes __lyconNative
+├── main.js / preload.js       # Mirrored development entry points
 ├── package.json               # Electron + adblocker deps
 ├── sync-ui-bundle.sh          # Sync src/ → both platform asset folders
 ├── BRIDGE_CONTRACT.md         # The __lyconNative API contract
@@ -205,7 +206,7 @@ bundle works on WinUI and Android too.
 Expected: 26/26 assertions pass across 6 test suites
 (navigation, single-tab, keyboard, bookmarks-history, downloads, shields).
 
-Test reports land in `download/lycon-tests/test-report.json`.
+Test reports land in `download/lycon-tests/test-report.json` (the directory is ignored by Git).
 
 ## Documentation
 
@@ -220,7 +221,7 @@ Test reports land in `download/lycon-tests/test-report.json`.
 ## Tech stack
 
 - **Shared UI**: HTML / CSS / Vanilla JS (no framework, no build step)
-- **Desktop**: Electron 33 + Chromium + `@cliqz/adblocker-electron`
+- **Desktop**: Electron 43 + Chromium + `@cliqz/adblocker-electron`
 - **Windows**: WinUI 3 (.NET 8, C#) + WebView2 + Newtonsoft.Json
 - **Android**: Kotlin + GeckoView (Firefox engine) + built-in tracking protection
 
@@ -230,4 +231,4 @@ MPL-2.0 — Mozilla Public License 2.0.
 
 ---
 
-*Browse wild. Browse free.* 🦊
+*Browse wild. Browse free.*
