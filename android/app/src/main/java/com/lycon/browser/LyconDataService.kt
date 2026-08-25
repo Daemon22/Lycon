@@ -31,6 +31,8 @@ class LyconDataService(private val context: Context) {
             put("startupPage", "startpage")
             put("privateTabDefault", false)
             put("httpsOnly", true)
+            put("sensitivity", "balanced")
+            put("agentDefaultConnectorId", "")
         }
         if (!settingsFile.exists()) return defaults
         return try {

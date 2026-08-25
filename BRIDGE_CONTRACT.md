@@ -69,7 +69,14 @@ interface LyconNative {
 | `window:maximize` | — | `void` | Toggle maximize/restore |
 | `window:close` | — | `void` | Close the host window |
 | `local:chooseFile` | — | `{ path, url, name } \| null` | Open a native file picker and return a local file URL |
-| `local:resolvePath` | `path: string` | `string \| null` | Convert a user-entered local path to a file URL |
+| `local:resolvePath` | `{ input: string }` | `string \| null` | Convert a user-entered local path to a file URL |
+| `agents:list` | — | `AgentConnector[]` | List sanitized optional intelligence connections; secrets are never returned |
+| `agents:save` | `AgentConnectorInput` | `AgentConnector` | Validate and persist a local or remote compatible connection |
+| `agents:remove` | `id: string` | `AgentConnector[]` | Remove a connection and its protected credential |
+| `agents:test` | `AgentConnectorInput` | `{ ok, status }` | Explicitly test an endpoint without page context |
+| `agents:request` | `AgentRequest` | `{ text, status }` | Send an explicitly confirmed request through a compatible connection |
+| `agents:audit` | — | `AgentAudit[]` | Return local metadata for outbound intelligence requests |
+| `agents:audit:clear` | — | `[]` | Clear local intelligence request metadata |
 | `shell:openExternal` | `url: string` | `void` | Open a URL in the OS default browser (for external links) |
 
 ## Events (on)
@@ -83,6 +90,8 @@ interface LyconNative {
 | `downloads:done` | `Download` | A download completes (state = 'completed' or 'interrupted') |
 | `tabs:openRequested` | `{ url }` | A page calls `window.open()` — host should open a new tab |
 | `https:upgraded` | `{ from, to }` | HTTP→HTTPS upgrade fires (only when HTTPS-Only mode is on) |
+| `agents:auditChanged` | `AgentAudit` | A user-initiated connection test or request is recorded locally |
+| `agents:openRequested` | — | A start-page action asks the shell to open the optional intelligence panel |
 
 ## Types
 
@@ -95,6 +104,9 @@ interface Settings {
   startupPage: 'startpage' | 'blank';
   privateTabDefault: boolean;
   httpsOnly: boolean;
+  sensitivity: 'hardened' | 'balanced' | 'permissive';
+  agentDefaultConnectorId: string;
+  siteSensitivity: { [origin: string]: 'hardened' | 'balanced' | 'permissive' };
 }
 
 interface SearchEngines {
@@ -134,6 +146,44 @@ interface LocalFile {
   url: string;
   name: string;
 }
+
+interface AgentConnector {
+  id: string;
+  name: string;
+  location: 'local' | 'remote';
+  protocol: 'openai-chat';
+  endpoint: string;
+  model?: string;
+  enabled: boolean;
+  contextScopes: ('none' | 'selection' | 'page' | 'tab' | 'localFile')[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface AgentConnectorInput extends Partial<AgentConnector> {
+  apiKey?: string; // write-only; stored by the native host using protected storage
+}
+
+interface AgentRequest {
+  connectorId: string;
+  prompt: string;
+  scope: 'none' | 'selection' | 'page' | 'tab' | 'localFile';
+  contextText?: string;
+  page?: { title?: string; url?: string };
+  confirmed: true; // native hosts must reject requests without explicit confirmation
+}
+
+interface AgentAudit {
+  id: string;
+  createdAt: number;
+  connectorId: string;
+  connectorName: string;
+  destination: string;
+  scope: string;
+  state: 'tested' | 'completed' | 'failed';
+  status?: number;
+  error?: string;
+}
 ```
 
 ## Platform-specific implementation notes
@@ -143,6 +193,8 @@ interface LocalFile {
 - `__lyconNative.invoke` → `ipcRenderer.invoke(action, payload)`
 - `local:chooseFile` → `dialog.showOpenDialog({ properties: ['openFile'] })`, returning a `file://` URL
 - `local:resolvePath` → `pathToFileURL(path.resolve(input))` with `~/` expansion
+- `agents:*` → protected connector storage, explicit HTTP request dispatch, and local metadata-only audit records
+- `agents:request` must reject payloads without `confirmed: true`
 - `__lyconNative.on` → subscribe to channel `lycon:event:${event}` via `ipcRenderer.on`
 - Main process sends events via `mainWindow.webContents.send('lycon:event:<name>', payload)`
 - See `preload.js` for the reference implementation

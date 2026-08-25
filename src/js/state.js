@@ -16,8 +16,13 @@
       startupPage: 'startpage',
       privateTabDefault: false,
       httpsOnly: true,
+      sensitivity: 'balanced',
+      agentDefaultConnectorId: '',
+      siteSensitivity: {},
     },
     searchEngines: {},
+    connectors: [],
+    agentAudit: [],
     shieldsBlocked: 0,        // global counter for active tab display
     shieldsPerTab: new Map(), // tabId -> count
     bookmarks: [],

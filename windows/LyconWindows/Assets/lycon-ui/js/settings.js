@@ -21,6 +21,19 @@
     emit('settings:changed', state.settings);
   }
 
+  function renderPostureIndicator() {
+    const button = document.getElementById('posture-btn');
+    const label = document.getElementById('posture-label');
+    if (!button || !label) return;
+    const posture = state.settings.sensitivity || 'balanced';
+    const names = { hardened: 'Hardened', balanced: 'Balanced', permissive: 'Permissive' };
+    const explanations = { hardened: 'Unknown terrain: more protective prompts and restrictions.', balanced: 'Everyday browsing: strong protections with normal compatibility.', permissive: 'Trusted development: fewer restrictions for environments you choose.' };
+    label.textContent = names[posture] || names.balanced;
+    button.dataset.posture = posture;
+    button.title = `Security sensitivity: ${label.textContent}. ${explanations[posture] || explanations.balanced} Open settings to change.`;
+    button.setAttribute('aria-label', button.title);
+  }
+
   function applyTheme() {
     const html = document.documentElement;
     const s = state.settings;
@@ -30,6 +43,7 @@
     }
     html.dataset.theme = effective;
     html.dataset.accent = s.accent || 'orange';
+    renderPostureIndicator();
   }
 
   function open() {
@@ -105,6 +119,28 @@
         </label>
       </div>
 
+      <h3>Hunting posture</h3>
+      <div class="modal-row modal-row-stack">
+        <div>
+          <label>Security sensitivity</label>
+          <div class="desc">Choose how perceptive and guarded Lycon should be. This never enables an agent or sends data.</div>
+        </div>
+        <div class="posture-chips" id="sensitivity-chips" role="radiogroup" aria-label="Security sensitivity">
+          <button class="chip posture-chip" data-sensitivity="hardened" aria-label="Hardened sensitivity"><strong>Hardened</strong><small>Unknown terrain</small></button>
+          <button class="chip posture-chip" data-sensitivity="balanced" aria-label="Balanced sensitivity"><strong>Balanced</strong><small>Everyday browsing</small></button>
+          <button class="chip posture-chip" data-sensitivity="permissive" aria-label="Permissive sensitivity"><strong>Permissive</strong><small>Trusted development</small></button>
+        </div>
+      </div>
+
+      <h3>Optional intelligence</h3>
+      <div class="modal-row">
+        <div>
+          <label>No connection is required</label>
+          <div class="desc">Connect local or remote intelligence only when you choose. Requests always show their destination and context first.</div>
+        </div>
+        <button class="btn btn-subtle" id="settings-agents">Manage connections</button>
+      </div>
+
       <h3>Startup</h3>
       <div class="modal-row">
         <div>
@@ -138,6 +174,10 @@
       modalContent.querySelectorAll('#accent-chips .chip').forEach(c => {
         c.classList.toggle('active', c.dataset.accent === state.settings.accent);
       });
+      modalContent.querySelectorAll('#sensitivity-chips .chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.sensitivity === (state.settings.sensitivity || 'balanced'));
+        c.setAttribute('aria-checked', c.dataset.sensitivity === (state.settings.sensitivity || 'balanced'));
+      });
     };
     refreshChips();
 
@@ -146,6 +186,9 @@
     });
     modalContent.querySelectorAll('#accent-chips .chip').forEach(c => {
       c.addEventListener('click', () => set({ accent: c.dataset.accent }).then(refreshChips));
+    });
+    modalContent.querySelectorAll('#sensitivity-chips .chip').forEach(c => {
+      c.addEventListener('click', () => set({ sensitivity: c.dataset.sensitivity }).then(refreshChips));
     });
 
     modalContent.querySelector('#search-engine-select').addEventListener('change', (e) => {
@@ -172,6 +215,10 @@
     modalContent.querySelector('#startup-select').addEventListener('change', (e) => {
       set({ startupPage: e.target.value });
     });
+    modalContent.querySelector('#settings-agents').addEventListener('click', () => {
+      close();
+      if (window.LyconAgents) window.LyconAgents.openManager();
+    });
     modalContent.querySelector('#settings-done').addEventListener('click', close);
 
     modalHost.classList.remove('hidden');
@@ -182,6 +229,11 @@
   modalHost.addEventListener('click', (e) => {
     if (e.target === modalHost) close();
   });
+  document.getElementById('posture-btn').addEventListener('click', open);
+  document.getElementById('posture-btn').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
+  _on('settings:changed', renderPostureIndicator);
 
   // Listen to settings changes from other windows / IPC
   if (window.lycon && window.lycon.settings) {

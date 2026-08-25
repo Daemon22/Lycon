@@ -62,6 +62,7 @@
     .brand { font-size: clamp(30px, 4vw, 38px); font-weight: 750; letter-spacing: 0.6px; margin-bottom: 7px; }
     .brand .accent { color: var(--accent); }
     .tagline { font-size: 13px; color: var(--muted); letter-spacing: 0.2px; margin-bottom: 30px; }
+    .tagline-note { color: var(--accent); }
     .search-wrap {
       width: 100%;
       display: flex;
@@ -203,7 +204,7 @@
       <img src="./assets/wolf-logo.png" alt="Lycon wolf mascot" width="126" height="126" />
     </div>
     <div class="brand">L<span class="accent">y</span>con</div>
-    <div class="tagline">Browse wild. Browse free.</div>
+    <div class="tagline">Browse wild. Browse free. <span class="tagline-note">Intelligence is optional.</span></div>
 
     <form class="search-wrap" id="search-form" role="search">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -224,6 +225,10 @@
       <a class="local-card" href="file:///" id="open-local-root" aria-label="Browse local files">
         <span class="local-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-11Z"/><path d="M7 13h10M7 16h7"/></svg></span>
         <span class="local-copy"><span class="local-title">Browse local files</span><span class="local-detail">Open the local file system directly</span></span>
+      </a>
+      <a class="local-card" href="lycon-action://open-agents" id="open-agents" aria-label="Open optional intelligence">
+        <span class="local-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="m9.2 10.8 5.6-2.6M9.2 13.2l5.6 2.6"/></svg></span>
+        <span class="local-copy"><span class="local-title">Connect intelligence</span><span class="local-detail">Optional local or remote allies, on your terms</span></span>
       </a>
     </div>
 

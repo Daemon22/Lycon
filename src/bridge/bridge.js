@@ -128,6 +128,19 @@
       }),
     },
 
+    // ----- Optional intelligence -----
+    agents: {
+      list: () => native.invoke('agents:list'),
+      save: (connector) => native.invoke('agents:save', connector),
+      remove: (id) => native.invoke('agents:remove', id),
+      test: (connector) => native.invoke('agents:test', connector),
+      request: (request) => native.invoke('agents:request', request),
+      audit: () => native.invoke('agents:audit'),
+      clearAudit: () => native.invoke('agents:audit:clear'),
+      onAuditChanged: (cb) => native.on('agents:auditChanged', cb),
+      onOpenRequested: (cb) => native.on('agents:openRequested', cb),
+    },
+
     // ----- Shell -----
     shell: {
       openExternal: (url) => native.invoke('shell:openExternal', url),

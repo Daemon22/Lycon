@@ -86,6 +86,18 @@ function startTestServer() {
           <a href="/download">Download small file</a><br>
           <a href="/large-download">Download large file</a>
           </body></html>`);
+      } else if (url === '/agent') {
+        if (req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true, service: 'lycon-local-agent-test' }));
+        } else {
+          let body = '';
+          req.on('data', (chunk) => { body += chunk.toString('utf8'); });
+          req.on('end', () => {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ choices: [{ message: { content: 'Local connector accepted the explicit test request.' } }] }));
+          });
+        }
       } else if (url === '/ad') {
         res.writeHead(200, { 'Content-Type': 'application/javascript' });
         res.end('console.log("this is an ad script");');

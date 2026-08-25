@@ -58,7 +58,7 @@ lycon-browser/
 │   ├── startpage.html         # New-tab page (wolf logo + search + shortcuts)
 │   ├── bridge/
 │   │   └── bridge.js          # Wraps __lyconNative into window.lycon
-│   ├── js/                    # UI modules (state/tabs/nav/shields/...)
+│   ├── js/                    # UI modules (state/tabs/nav/shields/agents/...)
 │   ├── styles/                # CSS (themes/main/tabs)
 │   └── assets/
 │       ├── wolf-logo.png      # Supplied Lycon wolf identity artwork
@@ -171,11 +171,26 @@ All three platforms share the same UI feature set:
 | Theme picker (dark/light/system + 3 accents) | ✅ |
 | Custom wolf-themed start page with locally bundled authentic service marks | ✅ |
 | Local-first browsing (native file picker, file URLs, local paths, browser fallback) | ✅ |
+| Optional intelligence panel with local/remote OpenAI-compatible connections | ✅ |
+| Explicit context scopes, request confirmation, and local metadata-only audit log | ✅ |
+| Hunting posture indicator (Hardened / Balanced / Permissive) | ✅ |
 | Window state persistence | ✅ |
 | Built-in PDF viewer | ✅ (Electron + WinUI) |
 | DevTools (F12) | ✅ (Electron + WinUI) |
 | Screenshot tool | ✅ |
 | Search engine picker (DuckDuckGo / Google / Bing / Startpage) | ✅ |
+
+## Agent-agnostic intelligence
+
+Lycon is fully usable with **zero intelligence connected**. The optional intelligence panel is an intermediary for user-selected local models, self-hosted endpoints, cloud providers, browser-native services, or future adapters. Lycon does not start a background agent, inspect pages automatically, or silently transmit context.
+
+The first compatible adapter uses an OpenAI-compatible chat-completion shape. A connection records its name, local/remote location, endpoint, model, and allowed context scopes. API keys are accepted only by the native host and stored using protected platform storage; they are never returned to the renderer or included in normal settings JSON.
+
+Before a request leaves the device, Lycon shows the destination and the exact context category: prompt only, selected text, current page, or local file. The user must confirm the request. Lycon stores only request metadata locally—destination, connector, scope, timestamp, and result state—not prompts or page contents. See [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md) for the protocol boundary and [LYCON_VISION.md](LYCON_VISION.md) for the product principles.
+
+## Hunting posture and sovereignty
+
+The visible posture control provides **Hardened**, **Balanced**, and **Permissive** modes. Hardened is intended for unknown terrain, Balanced for everyday browsing, and Permissive for trusted development contexts. Changing posture does not enable intelligence or send any data. Lycon continues to treat `localhost`, `file://`, offline pages, and local web apps as first-class explicit destinations.
 
 ## Bridge architecture
 
@@ -205,8 +220,8 @@ bundle works on WinUI and Android too.
 ./tests/run-all-tests.sh
 ```
 
-Expected: 29/29 assertions pass across 7 test suites
-(navigation, single-tab, keyboard, local-files, bookmarks-history, downloads, shields).
+Expected: 40/40 assertions pass across 8 test suites
+(navigation, single-tab, keyboard, local-files, agents, bookmarks-history, downloads, shields).
 
 Test reports land in `download/lycon-tests/test-report.json` (the directory is ignored by Git).
 
@@ -215,9 +230,11 @@ Test reports land in `download/lycon-tests/test-report.json` (the directory is i
 | File | What it covers |
 |---|---|
 | `README.md` | Project overview + cross-platform architecture |
-| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (21 actions + 7 events) |
+| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (29 actions + 9 events) |
 | `INTEGRATION.md` | Merging Lycon into your existing Windows + Android apps |
 | `BRAND_ASSETS.md` | Sources and provenance for locally bundled service marks |
+| `LYCON_VISION.md` | Product principles and acceptance criteria |
+| `AGENT_ARCHITECTURE.md` | Connector, context, sensitivity, and audit design |
 | `windows/README.md` | Building the Windows .exe |
 | `android/README.md` | Building the Android .apk |
 

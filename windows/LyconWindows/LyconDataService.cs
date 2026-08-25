@@ -73,6 +73,8 @@ public class LyconDataService
         if (patch.StartupPage != null) current.StartupPage = patch.StartupPage;
         if (patch.PrivateTabDefault.HasValue) current.PrivateTabDefault = patch.PrivateTabDefault.Value;
         if (patch.HttpsOnly.HasValue) current.HttpsOnly = patch.HttpsOnly.Value;
+        if (patch.Sensitivity != null) current.Sensitivity = patch.Sensitivity;
+        if (patch.AgentDefaultConnectorId != null) current.AgentDefaultConnectorId = patch.AgentDefaultConnectorId;
         return SaveSettings(current);
     }
 
@@ -85,6 +87,8 @@ public class LyconDataService
         StartupPage = "startpage",
         PrivateTabDefault = false,
         HttpsOnly = true,
+        Sensitivity = "balanced",
+        AgentDefaultConnectorId = "",
     };
 
     // ----- Bookmarks -----
@@ -228,6 +232,8 @@ public class LyconSettings
     [JsonProperty("startupPage")] public string StartupPage { get; set; } = "startpage";
     [JsonProperty("privateTabDefault")] public bool? PrivateTabDefault { get; set; } = false;
     [JsonProperty("httpsOnly")] public bool? HttpsOnly { get; set; } = true;
+    [JsonProperty("sensitivity")] public string Sensitivity { get; set; } = "balanced";
+    [JsonProperty("agentDefaultConnectorId")] public string AgentDefaultConnectorId { get; set; } = "";
 }
 
 public class LyconBookmark

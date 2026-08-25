@@ -72,6 +72,9 @@
         }
         break;
       }
+      case 'agents':
+        if (window.LyconAgents) window.LyconAgents.open();
+        break;
       case 'settings':
         window.LyconSettings.open();
         break;

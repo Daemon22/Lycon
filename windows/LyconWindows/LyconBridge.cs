@@ -90,7 +90,9 @@ public class LyconBridge
             ["local:chooseFile"] = _ => PickLocalFileAsync(),
             ["local:resolvePath"] = payload =>
             {
-                var input = payload?.ToObject<string>()?.Trim() ?? "";
+                var input = payload?.Type == JTokenType.String
+                    ? payload.ToObject<string>()?.Trim() ?? ""
+                    : payload?.Value<string>("input")?.Trim() ?? "";
                 if (string.IsNullOrWhiteSpace(input)) return Task.FromResult<object>(null!);
                 if (input.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) return Task.FromResult<object>(input);
                 if (input.StartsWith("~/", StringComparison.Ordinal) || input.StartsWith("~\\", StringComparison.Ordinal))

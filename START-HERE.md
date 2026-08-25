@@ -9,6 +9,8 @@ lycon-browser/
 ├── README.md                  ← Start here — full overview
 ├── BRIDGE_CONTRACT.md         ← API contract for host platforms
 ├── INTEGRATION.md             ← Step-by-step merge guide for your existing apps
+├── LYCON_VISION.md            ← Product principles and acceptance criteria
+├── AGENT_ARCHITECTURE.md      ← Optional intelligence and security design
 ├── package.json               ← Electron app metadata
 ├── main.js                    ← Electron main process
 ├── preload.js                 ← Electron preload — exposes window.__lyconNative
@@ -20,7 +22,7 @@ lycon-browser/
 │   ├── bridge/bridge.js       ← Wraps __lyconNative into window.lycon
 │   ├── js/                    ← UI modules (state/tabs/nav/shields/...)
 │   ├── styles/                ← CSS (themes/main/tabs)
-│   └── assets/wolf-logo.png   ← Claire the wolf
+│   └── assets/                 ← Supplied wolf identity + authentic local brand marks
 │
 ├── windows/                   ← Windows WinUI 3 + WebView2 project (.NET 8, C#)
 │   ├── LyconWindows.sln       ← Open in Visual Studio 2022
@@ -41,7 +43,7 @@ lycon-browser/
 │
 ├── tests/                     ← E2E test suite (Electron-based)
 │   ├── run-all-tests.sh       ← Run all tests under Xvfb
-│   └── *.test.js              ← 6 test suites
+│   └── *.test.js              ← 8 test suites
 │
 └── build/                     ← Wolf logo + icon assets (PNG, ICO, ICNS)
 ```
@@ -115,8 +117,8 @@ cd lycon-browser
 ./tests/run-all-tests.sh
 ```
 
-Expected: 26/26 assertions pass across 6 test suites
-(navigation, single-tab, keyboard, bookmarks-history, downloads, shields).
+Expected: 40/40 assertions pass across 8 test suites
+(navigation, single-tab, keyboard, local-files, agents, bookmarks-history, downloads, shields).
 
 Test reports land in `download/lycon-tests/test-report.json`.
 
@@ -125,8 +127,10 @@ Test reports land in `download/lycon-tests/test-report.json`.
 | File | What it covers |
 |---|---|
 | `README.md` | Project overview + cross-platform architecture |
-| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (19 actions + 7 events) |
+| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (29 actions + 9 events) |
 | `INTEGRATION.md` | Merging Lycon into your existing Windows + Android apps |
+| `LYCON_VISION.md` | Product principles: no-agent completeness, sovereignty, and local-first browsing |
+| `AGENT_ARCHITECTURE.md` | Connector, context, sensitivity, and audit design |
 | `windows/README.md` | Building the Windows .exe |
 | `android/README.md` | Building the Android .apk |
 
