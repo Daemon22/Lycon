@@ -9,7 +9,7 @@ Electron (desktop), WinUI 3 + WebView2 (Windows), and Kotlin + GeckoView (Androi
 **Lycon is now an independent, standalone project.**
 **⚠️ This is currently a private repository.**
 
-![Lycon](build/wolf-logo-final.png)
+![Lycon](src/assets/wolf-logo.png)
 
 ## Three platforms, one UI
 
@@ -103,7 +103,7 @@ lycon-browser/
 │   ├── *.test.js              # 7 test suites
 │
 ├── build/                     # Wolf logo + icon assets
-│   ├── wolf-logo-final.png    # 1024x1024 source
+│   ├── wolf-logo-final.png   # Legacy build asset; source of truth is src/assets/wolf-logo.png
 │   ├── icon.png               # 512x512 main
 │   ├── icon.ico               # Windows
 │   ├── icon.icns              # macOS
