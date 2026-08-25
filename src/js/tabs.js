@@ -30,6 +30,9 @@
       + (t.muted ? ' muted' : '');
     el.dataset.id = t.id;
     el.draggable = !t.pinned;
+    el.setAttribute('role', 'tab');
+    el.setAttribute('tabindex', t.id === state.activeId ? '0' : '-1');
+    el.setAttribute('aria-selected', t.id === state.activeId ? 'true' : 'false');
 
     const favicon = document.createElement('div');
     favicon.className = 'tab-favicon';
@@ -38,15 +41,16 @@
       sp.className = 'spinner';
       favicon.appendChild(sp);
     } else if (t.pinned) {
-      favicon.textContent = '📌';
+      favicon.textContent = '•';
     } else if (t.favicon) {
       const img = document.createElement('img');
       img.src = t.favicon;
-      img.onerror = () => { favicon.textContent = t.private ? '🕶' : '🌐'; };
+      img.onerror = () => { favicon.textContent = t.private ? 'P' : '•'; };
       favicon.appendChild(img);
     } else {
-      favicon.textContent = t.private ? '🕶' : '🌐';
+      favicon.textContent = t.private ? 'P' : '•';
     }
+    favicon.setAttribute('aria-hidden', 'true');
 
     const title = document.createElement('div');
     title.className = 'tab-title';
@@ -64,8 +68,9 @@
 
     const close = document.createElement('button');
     close.className = 'tab-close';
-    close.textContent = '✕';
+    close.textContent = '×';
     close.title = 'Close tab';
+    close.setAttribute('aria-label', `Close ${t.title || 'tab'}`);
     close.addEventListener('click', (e) => {
       e.stopPropagation();
       closeTab(t.id);
@@ -76,6 +81,16 @@
     el.appendChild(close);
 
     el.addEventListener('click', () => setActive(t.id));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setActive(t.id);
+      }
+      if (e.key === 'Delete' || (e.key === 'w' && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        closeTab(t.id);
+      }
+    });
     el.addEventListener('auxclick', (e) => {
       if (e.button === 1) { e.preventDefault(); closeTab(t.id); }
     });
@@ -111,7 +126,8 @@
   function updateTabEl(t) {
     const el = tabsEl.querySelector(`.tab[data-id="${t.id}"]`);
     if (!el) return;
-    el.outerHTML = buildTabEl(t).outerHTML;
+    // Replacing with the actual node preserves all event listeners and drag handlers.
+    el.replaceWith(buildTabEl(t));
   }
 
   // ---------------- Webview management ----------------
@@ -218,7 +234,7 @@
     wv.addEventListener('render-process-gone', (e) => {
       const details = e.details || {};
       console.warn('[Lycon] render-process-gone', t.id, 'reason=', details.reason, 'exitCode=', details.exitCode);
-      updateTab(t.id, { title: '💀 Crashed (' + (details.reason || 'unknown') + ')', loading: false });
+      updateTab(t.id, { title: 'Page crashed (' + (details.reason || 'unknown') + ')', loading: false });
     });
   }
 

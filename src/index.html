@@ -11,7 +11,7 @@
 </head>
 <body>
   <!-- ============== Title bar (draggable on macOS hidden inset) ============== -->
-  <header class="titlebar">
+  <header class="titlebar" aria-label="Lycon window controls">
     <div class="titlebar-drag"></div>
     <div class="titlebar-logo">
       <img src="./assets/wolf-logo.png" width="22" height="22" alt="Lycon" style="border-radius:4px;" />
@@ -19,25 +19,25 @@
     </div>
     <div class="titlebar-spacer"></div>
     <div class="titlebar-actions">
-      <button id="win-min" title="Minimize">—</button>
-      <button id="win-max" title="Maximize">▢</button>
-      <button id="win-close" title="Close">✕</button>
+      <button id="win-min" title="Minimize" aria-label="Minimize">—</button>
+      <button id="win-max" title="Maximize" aria-label="Maximize">▢</button>
+      <button id="win-close" title="Close" aria-label="Close">✕</button>
     </div>
   </header>
 
   <!-- ============== Tab strip ============== -->
-  <div class="tabstrip" id="tabstrip">
+  <div class="tabstrip" id="tabstrip" role="tablist" aria-label="Open tabs">
     <div class="tabs" id="tabs"></div>
-    <button class="tab-new" id="tab-new" title="New tab (Ctrl+T)">＋</button>
+    <button class="tab-new" id="tab-new" title="New tab (Ctrl+T)" aria-label="Open a new tab">＋</button>
   </div>
 
   <!-- ============== Toolbar ============== -->
-  <div class="toolbar">
+  <div class="toolbar" role="toolbar" aria-label="Browser navigation">
     <div class="toolbar-nav">
-      <button id="nav-back" title="Back (Alt+←)" disabled>❮</button>
-      <button id="nav-forward" title="Forward (Alt+→)" disabled>❯</button>
-      <button id="nav-reload" title="Reload (Ctrl+R)">⟳</button>
-      <button id="nav-home" title="Home">⌂</button>
+      <button id="nav-back" title="Back (Alt+←)" aria-label="Go back" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button id="nav-forward" title="Forward (Alt+→)" aria-label="Go forward" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+      <button id="nav-reload" title="Reload (Ctrl+R)" aria-label="Reload page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.6-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.6 2M20 19v-4h-4"/></svg></button>
+      <button id="nav-home" title="Home" aria-label="Open home page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v10h14V10M9 20v-6h6v6"/></svg></button>
     </div>
 
     <div class="urlbar-wrap">
@@ -51,20 +51,20 @@
         <span class="shields-count" id="shields-count">0</span>
       </div>
       <input id="urlbar" class="urlbar" type="text" placeholder="Search or type a URL" autocomplete="off" spellcheck="false" />
-      <button id="urlbar-bookmark" class="urlbar-action" title="Bookmark this page">☆</button>
+      <button id="urlbar-bookmark" class="urlbar-action" title="Bookmark this page" aria-label="Bookmark this page">☆</button>
     </div>
 
-    <div class="toolbar-actions">
-      <button id="act-downloads" title="Downloads (Ctrl+J)">⬇</button>
-      <button id="act-bookmarks" title="Bookmarks (Ctrl+B)">★</button>
-      <button id="act-history" title="History (Ctrl+H)">🕓</button>
-      <button id="act-private" title="New private tab (Ctrl+Shift+P)">🕶</button>
-      <button id="act-menu" title="Menu">☰</button>
+    <div class="toolbar-actions" aria-label="Browser tools">
+      <button id="act-downloads" title="Downloads (Ctrl+J)" aria-label="Open downloads"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v2h16v-2"/></svg></button>
+      <button id="act-bookmarks" title="Bookmarks (Ctrl+B)" aria-label="Open bookmarks"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17l-6-3-6 3V4Z"/></svg></button>
+      <button id="act-history" title="History (Ctrl+H)" aria-label="Open history"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2"/></svg></button>
+      <button id="act-private" title="New private tab (Ctrl+Shift+P)" aria-label="Open a new private tab"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19v-1a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v1M8 9a4 4 0 1 0 8 0M3 11h18"/></svg></button>
+      <button id="act-menu" title="Menu" aria-label="Open menu"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
     </div>
   </div>
 
   <!-- ============== Find bar ============== -->
-  <div class="findbar hidden" id="findbar">
+  <div class="findbar hidden" id="findbar" role="search" aria-label="Find in page">
     <input id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
     <span id="find-count" class="find-count">0/0</span>
     <button id="find-prev" title="Previous (Shift+Enter)">▲</button>
@@ -76,7 +76,7 @@
   <div class="content" id="content"></div>
 
   <!-- ============== Sidebar panels ============== -->
-  <aside class="sidebar hidden" id="sidebar">
+  <aside class="sidebar hidden" id="sidebar" aria-label="Browser panel">
     <header class="sidebar-header">
       <h2 id="sidebar-title">Panel</h2>
       <button id="sidebar-close">✕</button>
@@ -105,8 +105,8 @@
   <div class="statusbar hidden" id="statusbar"></div>
 
   <!-- ============== Modal host ============== -->
-  <div class="modal-host hidden" id="modal-host">
-    <div class="modal" id="modal-content"></div>
+  <div class="modal-host hidden" id="modal-host" role="presentation">
+    <div class="modal" id="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title"></div>
   </div>
 
   <!-- ============== Scripts ============== -->

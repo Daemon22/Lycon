@@ -34,7 +34,7 @@
 
   function open() {
     modalContent.innerHTML = `
-      <h2>⚙ Settings</h2>
+      <h2 id="modal-title">Settings</h2>
 
       <h3>Appearance</h3>
       <div class="modal-row">
@@ -43,9 +43,9 @@
           <div class="desc">Dark, light, or follow your system</div>
         </div>
         <div class="chip-row" id="theme-chips">
-          <button class="chip" data-theme="dark">🌙 Dark</button>
-          <button class="chip" data-theme="light">☀️ Light</button>
-          <button class="chip" data-theme="system">💻 System</button>
+          <button class="chip" data-theme="dark" aria-label="Use dark theme">Dark</button>
+          <button class="chip" data-theme="light" aria-label="Use light theme">Light</button>
+          <button class="chip" data-theme="system" aria-label="Follow system theme">System</button>
         </div>
       </div>
       <div class="modal-row">
@@ -54,9 +54,9 @@
           <div class="desc">Highlights for buttons, active tab, URL bar focus</div>
         </div>
         <div class="chip-row" id="accent-chips">
-          <button class="chip" data-accent="orange"><span class="swatch" style="background:#FB542B"></span>Wolf Orange</button>
-          <button class="chip" data-accent="purple"><span class="swatch" style="background:#7B2FE3"></span>Night Purple</button>
-          <button class="chip" data-accent="pink"><span class="swatch" style="background:#E84393"></span>Fox Pink</button>
+          <button class="chip" data-accent="orange" aria-label="Use gold accent"><span class="swatch" style="background:#d4a574"></span>Gold</button>
+          <button class="chip" data-accent="purple" aria-label="Use teal accent"><span class="swatch" style="background:#38aaa0"></span>Teal</button>
+          <button class="chip" data-accent="pink" aria-label="Use sage accent"><span class="swatch" style="background:#7fb069"></span>Sage</button>
         </div>
       </div>
 
@@ -80,8 +80,8 @@
           <div class="desc">Block ads, trackers, and fingerprinting scripts</div>
         </div>
         <label class="switch" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="shields-toggle" ${state.settings.shieldsEnabled ? 'checked' : ''} />
-          <span style="font-size:12px;color:var(--fg-secondary);">${state.settings.shieldsEnabled ? 'On' : 'Off'}</span>
+          <input type="checkbox" id="shields-toggle" ${state.settings.shieldsEnabled ? 'checked' : ''} aria-label="Enable Lycon Shields" />
+          <span class="toggle-label" style="font-size:12px;color:var(--fg-secondary);">${state.settings.shieldsEnabled ? 'On' : 'Off'}</span>
         </label>
       </div>
       <div class="modal-row">
@@ -90,8 +90,8 @@
           <div class="desc">New tabs use a no-history partition (always-on private)</div>
         </div>
         <label class="switch" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="private-default-toggle" ${state.settings.privateTabDefault ? 'checked' : ''} />
-          <span style="font-size:12px;color:var(--fg-secondary);">${state.settings.privateTabDefault ? 'On' : 'Off'}</span>
+          <input type="checkbox" id="private-default-toggle" ${state.settings.privateTabDefault ? 'checked' : ''} aria-label="Open new tabs in private mode by default" />
+          <span class="toggle-label" style="font-size:12px;color:var(--fg-secondary);">${state.settings.privateTabDefault ? 'On' : 'Off'}</span>
         </label>
       </div>
       <div class="modal-row">
@@ -100,8 +100,8 @@
           <div class="desc">Automatically upgrade insecure HTTP requests to HTTPS (localhost exempt)</div>
         </div>
         <label class="switch" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="https-only-toggle" ${state.settings.httpsOnly !== false ? 'checked' : ''} />
-          <span style="font-size:12px;color:var(--fg-secondary);">${state.settings.httpsOnly !== false ? 'On' : 'Off'}</span>
+          <input type="checkbox" id="https-only-toggle" ${state.settings.httpsOnly !== false ? 'checked' : ''} aria-label="Enable HTTPS-only mode" />
+          <span class="toggle-label" style="font-size:12px;color:var(--fg-secondary);">${state.settings.httpsOnly !== false ? 'On' : 'Off'}</span>
         </label>
       </div>
 
@@ -152,16 +152,21 @@
       set({ searchEngine: e.target.value });
     });
     modalContent.querySelector('#shields-toggle').addEventListener('change', (e) => {
-      window.lycon.shields.toggle(e.target.checked).then(s => {
+      const input = e.target;
+      const label = input.parentElement.querySelector('.toggle-label');
+      if (label) label.textContent = input.checked ? 'On' : 'Off';
+      window.lycon.shields.toggle(input.checked).then(s => {
         Object.assign(state.settings, s);
         applyTheme();
         if (window.LyconShields) window.LyconShields.refresh();
       });
     });
     modalContent.querySelector('#private-default-toggle').addEventListener('change', (e) => {
+      e.target.parentElement.querySelector('.toggle-label').textContent = e.target.checked ? 'On' : 'Off';
       set({ privateTabDefault: e.target.checked });
     });
     modalContent.querySelector('#https-only-toggle').addEventListener('change', (e) => {
+      e.target.parentElement.querySelector('.toggle-label').textContent = e.target.checked ? 'On' : 'Off';
       set({ httpsOnly: e.target.checked });
     });
     modalContent.querySelector('#startup-select').addEventListener('change', (e) => {

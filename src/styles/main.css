@@ -102,9 +102,28 @@ body {
 }
 .toolbar-nav button:disabled { opacity: 0.35; }
 
+.icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible,
+.tab:focus-visible, .shortcut:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.urlbar-security svg, .urlbar-shields svg { flex-shrink: 0; }
+
 /* URL bar */
 .urlbar-wrap {
   flex: 1;
+  min-width: 160px;
   display: flex;
   align-items: center;
   background: var(--bg-input);
@@ -146,6 +165,7 @@ body {
 
 .urlbar {
   flex: 1;
+  min-width: 0;
   background: transparent !important;
   border: 0 !important;
   padding: 8px 10px !important;
@@ -370,7 +390,22 @@ body {
   overflow: auto;
   padding: 24px;
 }
-.modal h2 { font-size: 18px; margin-bottom: 16px; color: var(--fg-primary); }
+.modal h2 {
+  font-size: 19px;
+  line-height: 1.2;
+  margin-bottom: 18px;
+  color: var(--fg-primary);
+  letter-spacing: -0.2px;
+}
+.modal h2::after {
+  content: '';
+  display: block;
+  width: 28px;
+  height: 3px;
+  margin-top: 9px;
+  border-radius: 3px;
+  background: var(--accent);
+}
 .modal h3 { font-size: 13px; margin: 16px 0 8px; color: var(--fg-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 
 .modal-row {
@@ -406,6 +441,27 @@ body {
   color: var(--accent-fg);
 }
 .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+@media (max-width: 760px) {
+  .toolbar { gap: 4px; padding-inline: 8px; }
+  .toolbar-nav, .toolbar-actions { gap: 0; }
+  .toolbar-nav button, .toolbar-actions button { width: 29px; height: 30px; }
+  .toolbar-actions button[title^="Downloads"],
+  .toolbar-actions button[title^="Bookmarks"] { display: none; }
+  .urlbar-shields { padding-inline: 4px; }
+  .urlbar { padding-inline: 6px !important; }
+  .tab { min-width: 112px; }
+  .modal { min-width: min(480px, calc(100vw - 32px)); padding: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ---------- Theme picker chips ---------- */
 .chip-row { display: flex; gap: 8px; flex-wrap: wrap; }

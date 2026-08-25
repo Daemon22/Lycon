@@ -35,7 +35,7 @@ const fs = require('fs');
 const http = require('http');
 
 const _ROOT = path.resolve(__dirname, '..');
-const OUT_DIR = '/home/z/my-project/download/lycon-tests';
+const OUT_DIR = process.env.LYCON_TEST_OUT_DIR || path.join(_ROOT, 'download', 'lycon-tests');
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 // ---------------------------------------------------------------------------
@@ -236,13 +236,13 @@ async function runTests() {
   // Start the local test HTTP server (used for downloads, shields, etc.)
   await startTestServer();
 
-  // Require the real Lycon main.js so its IPC handlers, sessions, blocker,
+  // Require the real Lycon main process so its IPC handlers, sessions, blocker,
   // and downloads wiring all get set up. It will also try to create its own
   // BrowserWindow, but we'll set up a hook so we can capture a reference to it.
-  require('../main.js');
+  require('../main.cjs');
 
   // Wait for the Lycon main process to create its window.
-  // main.js exports nothing, so we poll for the window via app.getWindows / BrowserWindow.getAllWindows
+  // The entry point exports nothing, so we poll for the window via BrowserWindow.getAllWindows
   let window = null;
   for (let i = 0; i < 60; i++) {
     const wins = BrowserWindow.getAllWindows();

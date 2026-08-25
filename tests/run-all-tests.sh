@@ -42,7 +42,7 @@ pkill -9 Xvfb 2>/dev/null || true
 pkill -9 electron 2>/dev/null || true
 
 echo ""
-echo "Test report: /home/z/my-project/download/lycon-tests/test-report.json"
-echo "Screenshots: /home/z/my-project/download/lycon-tests/"
+echo "Test report: $PROJECT_DIR/download/lycon-tests/test-report.json"
+echo "Screenshots: $PROJECT_DIR/download/lycon-tests/"
 
 exit $EXIT_CODE

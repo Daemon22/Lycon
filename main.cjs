@@ -75,7 +75,7 @@ let totalBlockedCount = 0; // global counter for diagnostics
 
 const defaultSettings = {
   theme: 'dark',          // 'dark' | 'light' | 'system'
-  accent: '#FB542B',      // Lycon orange
+  accent: 'orange',       // Gold accent key used by the shared UI
   searchEngine: 'duckduckgo',  // duckduckgo | google | bing | startpage
   shieldsEnabled: true,
   startupPage: 'startpage',

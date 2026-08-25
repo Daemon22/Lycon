@@ -25,26 +25,28 @@
   border-bottom: 0;
   cursor: pointer;
   position: relative;
-  transition: background 0.12s, transform 0.08s;
+  transition: background 0.12s, transform 0.08s, border-color 0.12s;
   user-select: none;
 }
 .tab:hover { background: var(--bg-tab-hover); }
 .tab.active {
   background: var(--bg-tab-active);
   border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 .tab.dragging { opacity: 0.4; }
 .tab.drag-over { box-shadow: inset -2px 0 0 var(--accent); }
 
 .tab-favicon {
-  width: 16px; height: 16px;
+  width: 18px; height: 18px;
   flex-shrink: 0;
   display: grid; place-items: center;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--fg-secondary);
 }
 .tab-favicon img {
-  width: 16px; height: 16px;
+  width: 18px; height: 18px;
   border-radius: 2px;
 }
 .tab-favicon .spinner {
@@ -79,19 +81,28 @@
 
 /* Private tab indicator */
 .tab.private .tab-favicon::after {
-  content: '🕶';
+  content: 'P';
   position: absolute;
-  font-size: 9px;
-  bottom: -2px; right: -2px;
-  filter: grayscale(1);
+  right: -5px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--lycon-purple);
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .tab.private {
-  background: linear-gradient(180deg, rgba(123,47,227,0.10), transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lycon-purple) 10%, transparent), transparent);
 }
 .tab.private.active {
   background: var(--bg-tab-active);
-  border-top: 2px solid var(--lycon-purple);
+  box-shadow: inset 0 2px 0 var(--lycon-purple);
   padding-top: 0;
 }
 
@@ -103,13 +114,8 @@
 }
 .tab.pinned .tab-close { display: none; }
 
-/* Muted indicator */
-.tab.muted .tab-title::after {
-  content: '🔇';
-  font-size: 9px;
-  margin-left: 4px;
-  opacity: 0.7;
-}
+/* Muted tabs use a subtle state treatment; the label is added by tabs.js. */
+.tab.muted .tab-title { color: var(--fg-muted); }
 
 /* New tab button */
 .tab-new {
@@ -122,11 +128,3 @@
   margin-left: 2px;
 }
 .tab-new:hover { background: var(--bg-tab-hover); color: var(--fg-primary); }
-
-/* Tab audio indicator */
-.tab.muted .tab-favicon::before {
-  content: '🔇';
-  position: absolute;
-  font-size: 8px;
-  top: -2px; right: -4px;
-}
