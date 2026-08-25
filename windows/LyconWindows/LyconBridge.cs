@@ -21,6 +21,7 @@ public class LyconBridge
 {
     private readonly LyconDataService _data;
     private readonly LyconShieldsService _shields;
+    private readonly LyconAgentService _agents;
     private readonly MainWindow _window;
     private readonly Dictionary<string, Func<JToken?, Task<object>>> _handlers;
     private int _nextCallId = 1;
@@ -30,6 +31,7 @@ public class LyconBridge
     {
         _data = data;
         _shields = shields;
+        _agents = new LyconAgentService(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lycon", "lycon-data"));
         _window = window;
 
         // ----- Search engines (mirror Electron main.js) -----
@@ -99,6 +101,13 @@ public class LyconBridge
                     input = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), input.Substring(2));
                 return Task.FromResult<object>(new Uri(Path.GetFullPath(input)).AbsoluteUri);
             },
+            ["agents:list"] = _ => Task.FromResult<object>(_agents.List()),
+            ["agents:save"] = payload => Task.FromResult<object>(_agents.Save(payload as JObject ?? new JObject())),
+            ["agents:remove"] = payload => Task.FromResult<object>(_agents.Remove(payload?.Value<string>("id") ?? payload?.ToObject<string>() ?? "")),
+            ["agents:test"] = payload => _agents.TestAsync(payload as JObject ?? new JObject()).ContinueWith(t => (object)t.Result),
+            ["agents:request"] = payload => _agents.RequestAsync(payload as JObject ?? new JObject()).ContinueWith(t => (object)t.Result),
+            ["agents:audit"] = _ => Task.FromResult<object>(_agents.Audit()),
+            ["agents:audit:clear"] = _ => Task.FromResult<object>(_agents.ClearAudit()),
             ["shell:openExternal"] = payload =>
             {
                 var url = payload?.ToObject<string>() ?? "";

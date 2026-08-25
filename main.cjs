@@ -555,7 +555,8 @@ function registerIpc() {
     if (!settings.agentDefaultConnectorId) saveSettings({ ...settings, agentDefaultConnectorId: connector.id });
     return publicConnector(connector);
   });
-  ipcMain.handle('agents:remove', (_e, id) => {
+  ipcMain.handle('agents:remove', (_e, payload) => {
+    const id = typeof payload === 'string' ? payload : payload && payload.id;
     const list = loadConnectors().filter((item) => item.id !== id);
     writeJSON(FILES.connectors, list);
     writeConnectorSecret(id, '');

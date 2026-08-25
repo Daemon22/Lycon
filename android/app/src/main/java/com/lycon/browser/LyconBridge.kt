@@ -8,6 +8,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 
 /**
  * Bridge between GeckoView's JS and native Kotlin code.
@@ -32,6 +34,8 @@ class LyconBridge(
     private val onWindowMinimize: () -> Unit,
     private val onWindowMaximize: () -> Unit,
 ) {
+
+    private val agents = LyconAgentService(context)
 
     private val handlers: Map<String, (JSONObject?) -> Any> = mapOf(
         "settings:get" to { _ -> dataService.loadSettings() },
@@ -95,6 +99,13 @@ class LyconBridge(
             val input = payload?.optString("input")?.trim() ?: ""
             if (input.startsWith("file://", ignoreCase = true) || input.startsWith("content://", ignoreCase = true)) input else JSONObject.NULL
         },
+        "agents:list" to { _ -> agents.list() },
+        "agents:save" to { payload -> agents.save(payload ?: JSONObject()) },
+        "agents:remove" to { payload -> agents.remove(payload?.optString("id") ?: payload?.toString() ?: "") },
+        "agents:test" to { payload -> runBlocking(Dispatchers.IO) { agents.test(payload ?: JSONObject()) } },
+        "agents:request" to { payload -> runBlocking(Dispatchers.IO) { agents.request(payload ?: JSONObject()) } },
+        "agents:audit" to { _ -> agents.audit() },
+        "agents:audit:clear" to { _ -> agents.clearAudit() },
         "shell:openExternal" to { payload ->
             val url = payload?.toString() ?: ""
             if (url.isNotEmpty()) {

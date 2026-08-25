@@ -132,7 +132,7 @@
     agents: {
       list: () => native.invoke('agents:list'),
       save: (connector) => native.invoke('agents:save', connector),
-      remove: (id) => native.invoke('agents:remove', id),
+      remove: (id) => native.invoke('agents:remove', { id }),
       test: (connector) => native.invoke('agents:test', connector),
       request: (request) => native.invoke('agents:request', request),
       audit: () => native.invoke('agents:audit'),
