@@ -10,9 +10,11 @@ import {
   Globe2,
   HardDrive,
   LockKeyhole,
+  Home as HomeIcon,
   Menu,
   Moon,
   Network,
+  RotateCw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -74,8 +76,7 @@ export default function Home() {
       return;
     }
     const destination = /^https?:\/\//i.test(value) ? value : `https://duckduckgo.com/?q=${encodeURIComponent(value)}`;
-    window.open(destination, "_blank", "noopener,noreferrer");
-    setNotice(/^https?:\/\//i.test(value) ? "Opened in a new tab." : "Search opened in a new tab.");
+    window.location.assign(destination);
   }
 
   return (
@@ -95,6 +96,11 @@ export default function Home() {
           </nav>
           <div className="header-actions"><button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>{theme === "dark" ? "Light" : "Dark"}</span></button><button className="menu-button" type="button" aria-label="Open navigation menu" onClick={() => setNotice("Use the links above to explore Lycon online.")}><Menu size={19} /></button></div>
         </header>
+        <div className="browser-toolbar" aria-label="Browser toolbar">
+          <div className="browser-nav-buttons"><button type="button" aria-label="Go back" onClick={() => window.history.back()}>‹</button><button type="button" aria-label="Go forward" onClick={() => window.history.forward()}>›</button><button type="button" aria-label="Reload page" onClick={() => window.location.reload()}><RotateCw size={14} /></button><a href="/" aria-label="Browser home"><HomeIcon size={14} /></a></div>
+          <form className="address-bar" onSubmit={handleSearch} role="search"><LockKeyhole size={14} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search or enter web address" aria-label="Search or enter web address" /><span className="address-status">Private</span></form>
+          <div className="toolbar-spacer" aria-hidden="true" />
+        </div>
 
         <div className="console-frame">
         <section className="hero-block" aria-labelledby="hero-title">
@@ -104,12 +110,7 @@ export default function Home() {
           <h1 id="hero-title">Browse wild.<br /><em>Browse free.</em></h1>
           <p className="hero-copy">Lycon keeps the web in your hands. The online companion gives you a clear trailhead; the full Hunter browser brings local files, shields, and optional intelligence to your device.</p>
 
-          <form className="search-box" onSubmit={handleSearch} role="search">
-            <Search size={19} aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search or type a web address" aria-label="Search or type a web address" />
-            <button type="submit">Search <ChevronRight size={16} /></button>
-          </form>
-          <div className="search-note"><span>DuckDuckGo</span> is the default trailhead · opens in a new tab</div>
+          <div className="browser-note"><Search size={14} /><span>DuckDuckGo</span> default search · use the address bar above to navigate</div>
           <p className="sr-status" aria-live="polite">{notice}</p>
         </section>
 

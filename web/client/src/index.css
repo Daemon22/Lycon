@@ -154,3 +154,27 @@ h1 em { color: #d4a574; font-style: normal; }
 [data-theme="light"] .footer { border-top-color: rgba(61,43,29,.16); color: #8b7b69; }
 @media (max-width: 820px) { .download-grid { grid-template-columns: 1fr; } .doc-grid { grid-template-columns: 1fr; } .download-boundary, .doc-callout { grid-template-columns: auto 1fr; } .download-boundary span, .doc-callout span { grid-column: 2; } .download-boundary a, .doc-callout a { grid-column: 2; justify-self: start; } }
 @media (max-width: 520px) { .header-actions .theme-toggle span { display: none; } .theme-toggle { padding: 9px; } .subpage-hero, .doc-hero { padding: 58px 0 45px; } .subpage-kicker { margin-top: 31px; } .download-card, .doc-grid article { padding: 22px; } .footer { gap: 8px; } }
+
+/* Lycon browser chrome: the address field is navigation UI, not a landing-page search box. */
+.topbar { position: sticky; top: 0; z-index: 20; background: rgba(23,18,15,.88); backdrop-filter: blur(18px); }
+.browser-toolbar { position: sticky; top: 76px; z-index: 19; display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(212,165,116,.12); background: rgba(23,18,15,.78); backdrop-filter: blur(18px); }
+.browser-nav-buttons { display: flex; align-items: center; gap: 4px; }
+.browser-nav-buttons button, .browser-nav-buttons a { display: grid; place-items: center; width: 29px; height: 29px; border: 0; border-radius: 7px; color: #b3a28e; background: transparent; text-decoration: none; font-size: 21px; line-height: 1; transition: color 160ms ease, background 160ms ease; }
+.browser-nav-buttons button:hover, .browser-nav-buttons a:hover { color: #f8f0e5; background: rgba(212,165,116,.12); }
+.address-bar { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; height: 38px; padding: 0 12px; border: 1px solid rgba(212,165,116,.34); border-radius: 9px; color: #d4a574; background: rgba(42,32,26,.75); box-shadow: inset 0 1px 0 rgba(255,255,255,.025); transition: border-color 160ms ease, box-shadow 160ms ease; }
+.address-bar:focus-within { border-color: #d4a574; box-shadow: 0 0 0 3px rgba(212,165,116,.1); }
+.address-bar input { min-width: 0; flex: 1; border: 0; outline: 0; color: #f8f0e5; background: transparent; font-size: 13px; }
+.address-bar input::placeholder { color: #776957; }
+.address-status { flex: 0 0 auto; color: #56b5a6; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.toolbar-spacer { width: 83px; flex: 0 0 auto; }
+.browser-note { display: inline-flex; align-items: center; gap: 8px; margin-top: 26px; color: #776957; font-size: 11px; }
+.browser-note svg { color: #56b5a6; }
+.browser-note span { color: #d4a574; font-weight: 700; }
+[data-theme="light"] .topbar, [data-theme="light"] .browser-toolbar { background: rgba(245,240,232,.9); border-bottom-color: rgba(61,43,29,.15); }
+[data-theme="light"] .browser-nav-buttons button, [data-theme="light"] .browser-nav-buttons a { color: #695b4c; }
+[data-theme="light"] .browser-nav-buttons button:hover, [data-theme="light"] .browser-nav-buttons a:hover { color: #241a13; background: rgba(212,165,116,.16); }
+[data-theme="light"] .address-bar { border-color: rgba(61,43,29,.26); background: rgba(255,255,255,.75); }
+[data-theme="light"] .address-bar input { color: #241a13; }
+[data-theme="light"] .browser-note { color: #8b7b69; }
+@media (max-width: 820px) { .browser-toolbar { top: 76px; } .toolbar-spacer { display: none; } }
+@media (max-width: 520px) { .browser-toolbar { top: 64px; gap: 6px; padding: 8px 0; } .browser-nav-buttons { gap: 0; } .browser-nav-buttons button, .browser-nav-buttons a { width: 25px; height: 28px; } .address-bar { height: 35px; padding-inline: 9px; } .address-status { display: none; } .browser-note { margin-top: 20px; font-size: 10px; } }
