@@ -18,25 +18,25 @@
   --lycon-pink: var(--lycon-sage);
 
   /* Dark theme (default) — warm brown-black */
-  --bg-app:        #1a1410;
-  --bg-toolbar:    #221a14;
-  --bg-tabstrip:   #1a1410;
+  --bg-app:        #17120f;
+  --bg-toolbar:    #211914;
+  --bg-tabstrip:   #17120f;
   --bg-tab:        transparent;
-  --bg-tab-hover:  rgba(212, 165, 116, 0.06);
-  --bg-tab-active: #2a2018;
-  --bg-content:    #1a1410;
-  --bg-sidebar:    #221a14;
-  --bg-input:      #2a2018;
-  --bg-input-focus:#332820;
-  --bg-dropdown:   #2a2018;
-  --bg-modal:      #2a2018;
+  --bg-tab-hover:  rgba(212, 165, 116, 0.08);
+  --bg-tab-active: #2b211a;
+  --bg-content:    #17120f;
+  --bg-sidebar:    #211914;
+  --bg-input:      #2a201a;
+  --bg-input-focus:#33271f;
+  --bg-dropdown:   #2a201a;
+  --bg-modal:      #2a201a;
 
-  --fg-primary:    #f5ede0;
-  --fg-secondary:  #a89a85;
-  --fg-muted:      #6b5f50;
+  --fg-primary:    #f8f0e5;
+  --fg-secondary:  #b3a28e;
+  --fg-muted:      #776957;
 
-  --border:        rgba(212, 165, 116, 0.10);
-  --border-strong: rgba(212, 165, 116, 0.20);
+  --border:        rgba(212, 165, 116, 0.13);
+  --border-strong: rgba(212, 165, 116, 0.24);
 
   --accent: var(--lycon-gold);
   --accent-hover: var(--lycon-gold-hover);
@@ -46,12 +46,12 @@
   --success: #4caf50;
   --warning: #f4c430;
 
-  --radius: 10px;
-  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-sm: 7px;
   --radius-tab: 10px 10px 0 0;
 
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.30);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,0.48);
 
   --tab-h: 36px;
   --toolbar-h: 44px;
@@ -61,7 +61,7 @@
 [data-theme="light"] {
   --bg-app:        #f5f0e8;
   --bg-toolbar:    #ffffff;
-  --bg-tabstrip:   #ede5d8;
+  --bg-tabstrip:   #eee7dc;
   --bg-tab:        transparent;
   --bg-tab-hover:  rgba(0,0,0,0.04);
   --bg-tab-active: #ffffff;
@@ -72,12 +72,12 @@
   --bg-dropdown:   #ffffff;
   --bg-modal:      #ffffff;
 
-  --fg-primary:    #1a1410;
-  --fg-secondary:  #4a4035;
-  --fg-muted:      #8a7d6b;
+  --fg-primary:    #221a14;
+  --fg-secondary:  #574a3e;
+  --fg-muted:      #8b7b69;
 
-  --border:        rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.16);
+  --border:        rgba(61,43,29,0.12);
+  --border-strong: rgba(61,43,29,0.20);
 
   --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.20);
@@ -104,6 +104,7 @@ html, body {
   color: var(--fg-primary);
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button {

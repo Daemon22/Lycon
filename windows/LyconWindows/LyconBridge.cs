@@ -8,6 +8,8 @@ using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Windows.Storage.Pickers;
+using WinRT.Interop;
 
 namespace LyconWindows;
 
@@ -85,6 +87,16 @@ public class LyconBridge
             ["window:minimize"] = _ => { _window.Minimize(); return Task.FromResult<object>(true); },
             ["window:maximize"] = _ => { _window.Maximize(); return Task.FromResult<object>(true); },
             ["window:close"] = _ => { _window.Close(); return Task.FromResult<object>(true); },
+            ["local:chooseFile"] = _ => PickLocalFileAsync(),
+            ["local:resolvePath"] = payload =>
+            {
+                var input = payload?.ToObject<string>()?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(input)) return Task.FromResult<object>(null!);
+                if (input.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) return Task.FromResult<object>(input);
+                if (input.StartsWith("~/", StringComparison.Ordinal) || input.StartsWith("~\\", StringComparison.Ordinal))
+                    input = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), input.Substring(2));
+                return Task.FromResult<object>(new Uri(Path.GetFullPath(input)).AbsoluteUri);
+            },
             ["shell:openExternal"] = payload =>
             {
                 var url = payload?.ToObject<string>() ?? "";
@@ -92,6 +104,20 @@ public class LyconBridge
                 return Task.FromResult<object>(true);
             },
         };
+    }
+
+    private async Task<object> PickLocalFileAsync()
+    {
+        var picker = new FileOpenPicker
+        {
+            ViewMode = PickerViewMode.Thumbnail,
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+        };
+        picker.FileTypeFilter.Add("*");
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(_window));
+        var file = await picker.PickSingleFileAsync();
+        if (file == null) return new { canceled = true, path = "", url = "", name = "" };
+        return new { canceled = false, path = file.Path, url = new Uri(file.Path).AbsoluteUri, name = file.Name };
     }
 
     /// <summary>

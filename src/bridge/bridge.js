@@ -40,6 +40,20 @@
     return;
   }
 
+  function chooseFileWithInput() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '*/*';
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return resolve(null);
+        resolve({ name: file.name, path: file.name, url: URL.createObjectURL(file) });
+      }, { once: true });
+      input.click();
+    });
+  }
+
   // Build the high-level window.lycon API surface
   window.lycon = {
     // ----- Settings -----
@@ -103,6 +117,15 @@
     // ----- HTTPS-Only events -----
     https: {
       onUpgraded: (cb) => native.on('https:upgraded', cb),
+    },
+
+    // ----- Local files -----
+    local: {
+      chooseFile: () => native.invoke('local:chooseFile').then((result) => result && result.url ? result : chooseFileWithInput()).catch(() => chooseFileWithInput()),
+      resolvePath: (input) => native.invoke('local:resolvePath', { input }).catch(() => {
+        if (/^(?:file|blob|content):/i.test(input || '')) return input;
+        return null;
+      }),
     },
 
     // ----- Shell -----

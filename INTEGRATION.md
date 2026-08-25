@@ -46,7 +46,8 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
            ├── js/         (all UI modules)
            ├── styles/     (CSS)
            └── assets/
-               └── wolf-logo.png
+               ├── wolf-logo.png
+               └── brands/      (authentic local service SVG marks + manifest)
    ```
 2. Set **Build Action** → `Content` and **Copy to Output Directory** →
    `PreserveNewest` for all files under `Assets/lycon-ui/`.
@@ -84,7 +85,9 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
    core.Navigate("https://lycon.app/index.html");
    ```
 4. Set up downloads + popups + navigation handlers as shown in
-   `windows/LyconWindows/MainWindow.xaml.cs`.
+   `windows/LyconWindows/MainWindow.xaml.cs`. The reference Windows bridge also
+   implements `local:chooseFile` with `FileOpenPicker` and `local:resolvePath`
+   with `file://` URL conversion.
 
 ### Android (Kotlin + GeckoView)
 
@@ -124,7 +127,9 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
    session.loadUri("resource://android/assets/lycon-ui/index.html")
    ```
 5. See `android/app/src/main/java/com/lycon/browser/MainActivity.kt` for the
-   full reference implementation.
+   full reference implementation. Android receives a safe local-file bridge
+   response and the shared UI falls back to an Android-compatible browser file
+   input when the native picker is unavailable.
 
 ## Step 3 — Test the integration
 
@@ -134,7 +139,9 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
 2. Set the target to `x64` and build.
 3. Run — the Lycon UI should load in the WebView2 window.
 4. Verify:
-   - Start page renders with the wolf logo
+   - Start page renders the supplied wolf logo and authentic local shortcut marks
+   - Clicking **Open a local file** opens the native picker
+   - Typing an absolute local path such as `C:\\Users\\you\\Documents\\note.html` in the URL bar opens it
    - Typing `example.com` in the URL bar loads the site
    - Visiting a news site shows a non-zero shields count
    - Downloads panel shows files after download
@@ -146,7 +153,9 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
 2. Let Gradle sync (it'll download GeckoView — ~50MB).
 3. Connect an Android device (API 24+) or start an emulator.
 4. Run — the Lycon UI should load in the GeckoView.
-5. Verify the same items as Windows.
+5. Verify the same items as Windows, plus that **Open a local file** invokes the
+   browser file-input fallback and that an existing `file://` or `content://` URI
+   can be opened from the URL bar.
 
 ## Step 4 — Merge with your existing app's chrome
 

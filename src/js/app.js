@@ -54,6 +54,12 @@
       if (t && t.webview) t.webview.reload();
       return;
     }
+    // Ctrl+O — open local file
+    if (ctrl && !shift && (e.key === 'o' || e.key === 'O')) {
+      e.preventDefault();
+      window.LyconNav && window.LyconNav.openLocalFile();
+      return;
+    }
     // Ctrl+J — downloads
     if (ctrl && !shift && e.key === 'j') {
       e.preventDefault();

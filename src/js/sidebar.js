@@ -50,15 +50,17 @@
 
     const fav = document.createElement('div');
     fav.className = 'favicon';
+    const fallbackIcon = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.7 12h16.6M12 3.5c2.2 2.3 3.4 5.1 3.4 8.5s-1.2 6.2-3.4 8.5c-2.2-2.3-3.4-5.1-3.4-8.5s1.2-6.2 3.4-8.5Z"/></svg>';
     if (favicon) {
       const img = document.createElement('img');
       img.src = favicon;
+      img.alt = '';
       img.style.width = '14px';
       img.style.height = '14px';
-      img.onerror = () => { fav.textContent = '🌐'; };
+      img.addEventListener('error', () => { img.remove(); fav.innerHTML = fallbackIcon; }, { once: true });
       fav.appendChild(img);
     } else {
-      fav.textContent = '🌐';
+      fav.innerHTML = fallbackIcon;
     }
 
     const meta = document.createElement('div');
@@ -81,8 +83,9 @@
 
     const del = document.createElement('button');
     del.className = 'del';
-    del.textContent = '✕';
+    del.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 18 18M18 6 6 18"/></svg>';
     del.title = 'Remove';
+    del.setAttribute('aria-label', 'Remove');
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       if (onDelete) onDelete();
@@ -115,7 +118,7 @@
       items = items.filter(b => (b.title || '').toLowerCase().includes(f) || (b.url || '').toLowerCase().includes(f));
     }
     if (items.length === 0) {
-      sidebarBody.appendChild(emptyState('No bookmarks yet. Click the ☆ in the URL bar to save a page.'));
+      sidebarBody.appendChild(emptyState('No bookmarks yet. Click the bookmark icon in the URL bar to save a page.'));
       return;
     }
     for (const b of items) {

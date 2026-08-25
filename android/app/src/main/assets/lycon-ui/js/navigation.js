@@ -10,6 +10,7 @@
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
   const homeBtn = document.getElementById('nav-home');
+  const openFileBtn = document.getElementById('nav-open-file');
 
   const { state, on, getActive } = window.LyconState;
 
@@ -18,6 +19,7 @@
   const DOMAIN_RE = /^([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/.*)?$/i;
   const IP_RE = /^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/;
   const LOCALHOST_RE = /^localhost(:\d+)?(\/.*)?$/i;
+  const LOCAL_PATH_RE = /^(?:~[\\/]|\.{0,2}[\\/]|\/[a-zA-Z0-9_.-]|[a-zA-Z]:[\\/]|\\\\)/;
 
   function resolveInput(text) {
     text = (text || '').trim();
@@ -35,17 +37,35 @@
   }
 
   // ---------------- UI events ----------------
-  function commit() {
+  async function commit() {
     const text = urlbar.value.trim();
     if (!text) return;
     const t = getActive();
     if (!t) return;
+
+    if (LOCAL_PATH_RE.test(text) && window.lycon && window.lycon.local) {
+      const localUrl = await window.lycon.local.resolvePath(text);
+      if (!localUrl) return;
+      urlbar.value = localUrl;
+      if (window.LyconTabs) window.LyconTabs.loadUrlInTab(t, localUrl);
+      return;
+    }
+
     const url = resolveInput(text);
     urlbar.value = url;
     if (window.LyconTabs) window.LyconTabs.loadUrlInTab(t, url);
   }
 
+  async function openLocalFile() {
+    if (!window.lycon || !window.lycon.local) return;
+    const result = await window.lycon.local.chooseFile();
+    if (result && result.url && window.LyconTabs) {
+      window.LyconTabs.createTab({ url: result.url });
+    }
+  }
+
   urlbar.addEventListener('focus', () => urlbar.select());
+  if (openFileBtn) openFileBtn.addEventListener('click', openLocalFile);
   urlbar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     else if (e.key === 'Escape') {
@@ -159,5 +179,5 @@
   on('tab:updated', refreshNav);
 
   // Expose
-  window.LyconNav = { resolveInput, refreshNav, commit };
+  window.LyconNav = { resolveInput, refreshNav, commit, openLocalFile };
 })();

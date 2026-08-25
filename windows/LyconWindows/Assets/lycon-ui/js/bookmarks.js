@@ -39,15 +39,11 @@
     const t = getActive();
     const btn = document.getElementById('urlbar-bookmark');
     if (!btn) return;
-    if (t && t.url && isBookmarked(t.url)) {
-      btn.classList.add('active');
-      btn.textContent = '★';
-      btn.title = 'Remove bookmark';
-    } else {
-      btn.classList.remove('active');
-      btn.textContent = '☆';
-      btn.title = 'Bookmark this page';
-    }
+    const saved = Boolean(t && t.url && isBookmarked(t.url));
+    btn.classList.toggle('active', saved);
+    btn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>';
+    btn.title = saved ? 'Remove bookmark' : 'Bookmark this page';
+    btn.setAttribute('aria-label', saved ? 'Remove bookmark' : 'Bookmark this page');
   }
 
   document.getElementById('urlbar-bookmark').addEventListener('click', async () => {

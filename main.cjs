@@ -11,9 +11,10 @@
  *  - Expose IPC handlers to the renderer
  */
 
-const { app, BrowserWindow, ipcMain, session, DownloadItem: _DownloadItem, shell, Menu, dialog: _dialog, net } = require('electron');
+const { app, BrowserWindow, ipcMain, session, DownloadItem: _DownloadItem, shell, Menu, dialog, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { ElectronBlocker } = require('@cliqz/adblocker-electron');
 
 // Provide a fetch implementation backed by Electron's net module.
@@ -414,6 +415,31 @@ function registerIpc() {
   });
   ipcMain.handle('window:close', () => mainWindow && mainWindow.close());
 
+  // ----- Local files -----
+  ipcMain.handle('local:chooseFile', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Open a local file',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Readable files', extensions: ['html', 'htm', 'pdf', 'txt', 'md', 'json', 'csv', 'xml', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3', 'mp4', 'wav', 'webm'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const filePath = result.filePaths[0];
+    return { path: filePath, url: pathToFileURL(filePath).toString(), name: path.basename(filePath) };
+  });
+  ipcMain.handle('local:resolvePath', (_e, payload) => {
+    const input = typeof payload === 'string' ? payload : payload && payload.input;
+    if (typeof input !== 'string' || !input.trim()) return null;
+    const normalized = input.trim();
+    if (normalized.startsWith('file://')) return normalized;
+    const expanded = normalized.startsWith('~/') || normalized.startsWith('~\\')
+      ? path.join(app.getPath('home'), normalized.slice(2))
+      : normalized;
+    return pathToFileURL(path.resolve(expanded)).toString();
+  });
+
   // ----- Shell -----
   ipcMain.handle('shell:openExternal', (e, url) => shell.openExternal(url));
 }
@@ -471,8 +497,27 @@ app.on('web-contents-created', (event, contents) => {
     return { action: 'deny' };
   });
 
-  // HTTPS-Only mode: upgrade http:// to https:// before navigation
-  contents.on('will-navigate', (e, url) => {
+  // Handle local-file shortcuts emitted by the shared start page.
+  contents.on('will-navigate', async (e, url) => {
+    if (url === 'lycon-action://open-file') {
+      e.preventDefault();
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Open a local file',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Readable files', extensions: ['html', 'htm', 'pdf', 'txt', 'md', 'json', 'csv', 'xml', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3', 'mp4', 'wav', 'webm'] },
+          { name: 'All files', extensions: ['*'] },
+        ],
+      });
+      if (!result.canceled && result.filePaths[0]) {
+        contents.loadURL(pathToFileURL(result.filePaths[0]).toString()).catch((err) => {
+          console.error('[Lycon] local file navigation failed', err);
+        });
+      }
+      return;
+    }
+
+    // HTTPS-Only mode: upgrade http:// to https:// before navigation
     const settings = loadSettings();
     if (settings.httpsOnly && url.startsWith('http://')) {
       // Allow localhost for development

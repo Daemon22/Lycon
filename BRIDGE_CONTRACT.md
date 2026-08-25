@@ -68,6 +68,8 @@ interface LyconNative {
 | `window:minimize` | — | `void` | Minimize the host window |
 | `window:maximize` | — | `void` | Toggle maximize/restore |
 | `window:close` | — | `void` | Close the host window |
+| `local:chooseFile` | — | `{ path, url, name } \| null` | Open a native file picker and return a local file URL |
+| `local:resolvePath` | `path: string` | `string \| null` | Convert a user-entered local path to a file URL |
 | `shell:openExternal` | `url: string` | `void` | Open a URL in the OS default browser (for external links) |
 
 ## Events (on)
@@ -126,6 +128,12 @@ interface Download {
   endTime?: number;
   private?: boolean;
 }
+
+interface LocalFile {
+  path: string;
+  url: string;
+  name: string;
+}
 ```
 
 ## Platform-specific implementation notes
@@ -133,6 +141,8 @@ interface Download {
 ### Electron
 
 - `__lyconNative.invoke` → `ipcRenderer.invoke(action, payload)`
+- `local:chooseFile` → `dialog.showOpenDialog({ properties: ['openFile'] })`, returning a `file://` URL
+- `local:resolvePath` → `pathToFileURL(path.resolve(input))` with `~/` expansion
 - `__lyconNative.on` → subscribe to channel `lycon:event:${event}` via `ipcRenderer.on`
 - Main process sends events via `mainWindow.webContents.send('lycon:event:<name>', payload)`
 - See `preload.js` for the reference implementation

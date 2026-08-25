@@ -37,7 +37,7 @@ Electron (desktop), WinUI 3 + WebView2 (Windows), and Kotlin + GeckoView (Androi
 
 | Platform | Status | Tests |
 |---|---|---|
-| Electron (desktop) | ✅ Production-ready | **26/26 E2E tests pass** |
+| Electron (desktop) | ✅ Production-ready | **29/29 E2E assertions pass** |
 | Windows (WinUI 3 + WebView2) | ✅ Reference project complete | Manual build in VS 2022 |
 | Android (Kotlin + GeckoView) | ✅ Reference project complete | Manual build in Android Studio |
 
@@ -61,7 +61,8 @@ lycon-browser/
 │   ├── js/                    # UI modules (state/tabs/nav/shields/...)
 │   ├── styles/                # CSS (themes/main/tabs)
 │   └── assets/
-│       └── wolf-logo.png      # Claire the wolf (AI-generated)
+│       ├── wolf-logo.png      # Supplied Lycon wolf identity artwork
+│       └── brands/             # Locally bundled authentic service SVG marks
 │
 ├── windows/                   # WinUI 3 + WebView2 project
 │   ├── LyconWindows.sln       # Open in Visual Studio 2022
@@ -99,7 +100,7 @@ lycon-browser/
 ├── tests/                     # E2E test suite (Electron-based)
 │   ├── run-tests.js           # Test harness — launches Lycon, drives UI
 │   ├── run-all-tests.sh       # Xvfb wrapper for headless runs
-│   └── *.test.js              # 6 test suites
+│   ├── *.test.js              # 7 test suites
 │
 ├── build/                     # Wolf logo + icon assets
 │   ├── wolf-logo-final.png    # 1024x1024 source
@@ -168,7 +169,8 @@ All three platforms share the same UI feature set:
 | Private mode (separate session) | ✅ |
 | Find in page (Ctrl+F) | ✅ |
 | Theme picker (dark/light/system + 3 accents) | ✅ |
-| Custom wolf-themed start page | ✅ |
+| Custom wolf-themed start page with locally bundled authentic service marks | ✅ |
+| Local-first browsing (native file picker, file URLs, local paths, browser fallback) | ✅ |
 | Window state persistence | ✅ |
 | Built-in PDF viewer | ✅ (Electron + WinUI) |
 | DevTools (F12) | ✅ (Electron + WinUI) |
@@ -203,8 +205,8 @@ bundle works on WinUI and Android too.
 ./tests/run-all-tests.sh
 ```
 
-Expected: 26/26 assertions pass across 6 test suites
-(navigation, single-tab, keyboard, bookmarks-history, downloads, shields).
+Expected: 29/29 assertions pass across 7 test suites
+(navigation, single-tab, keyboard, local-files, bookmarks-history, downloads, shields).
 
 Test reports land in `download/lycon-tests/test-report.json` (the directory is ignored by Git).
 
@@ -213,8 +215,9 @@ Test reports land in `download/lycon-tests/test-report.json` (the directory is i
 | File | What it covers |
 |---|---|
 | `README.md` | Project overview + cross-platform architecture |
-| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (19 actions + 7 events) |
+| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract (21 actions + 7 events) |
 | `INTEGRATION.md` | Merging Lycon into your existing Windows + Android apps |
+| `BRAND_ASSETS.md` | Sources and provenance for locally bundled service marks |
 | `windows/README.md` | Building the Windows .exe |
 | `android/README.md` | Building the Android .apk |
 

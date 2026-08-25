@@ -1,6 +1,6 @@
 /**
  * Lycon Browser — Menu dropdown
- * Top-right ☰ menu with shortcuts to all features.
+ * Top-right menu with shortcuts to all features.
  */
 (function () {
   'use strict';
@@ -35,6 +35,9 @@
         break;
       case 'new-private':
         window.LyconPrivate.createPrivateTab();
+        break;
+      case 'open-file':
+        window.LyconNav && window.LyconNav.openLocalFile();
         break;
       case 'find':
         window.LyconFinder.open();

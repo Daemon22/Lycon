@@ -38,6 +38,7 @@
       <button id="nav-forward" title="Forward (Alt+→)" aria-label="Go forward" disabled><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
       <button id="nav-reload" title="Reload (Ctrl+R)" aria-label="Reload page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.6-2M4 5v4h4M4 13a8.1 8.1 0 0 0 15.6 2M20 19v-4h-4"/></svg></button>
       <button id="nav-home" title="Home" aria-label="Open home page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v10h14V10M9 20v-6h6v6"/></svg></button>
+      <button id="nav-open-file" title="Open local file (Ctrl+O)" aria-label="Open a local file"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H10l2 2h5.5A2.5 2.5 0 0 1 20 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z"/><path d="M4 10h16"/></svg></button>
     </div>
 
     <div class="urlbar-wrap">
@@ -50,8 +51,8 @@
         <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 2 L4 5 V11 C4 16 7 20 12 22 C17 20 20 16 20 11 V5 Z"/></svg>
         <span class="shields-count" id="shields-count">0</span>
       </div>
-      <input id="urlbar" class="urlbar" type="text" placeholder="Search or type a URL" autocomplete="off" spellcheck="false" />
-      <button id="urlbar-bookmark" class="urlbar-action" title="Bookmark this page" aria-label="Bookmark this page">☆</button>
+      <input id="urlbar" class="urlbar" type="text" placeholder="Search, enter a URL, or open a local path" autocomplete="off" spellcheck="false" aria-label="Search, enter a URL, or open a local path" />
+      <button id="urlbar-bookmark" class="urlbar-action" title="Bookmark this page" aria-label="Bookmark this page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg></button>
     </div>
 
     <div class="toolbar-actions" aria-label="Browser tools">
@@ -67,19 +68,19 @@
   <div class="findbar hidden" id="findbar" role="search" aria-label="Find in page">
     <input id="find-input" type="text" placeholder="Find in page" spellcheck="false" />
     <span id="find-count" class="find-count">0/0</span>
-    <button id="find-prev" title="Previous (Shift+Enter)">▲</button>
-    <button id="find-next" title="Next (Enter)">▼</button>
-    <button id="find-close" title="Close (Esc)">✕</button>
+    <button id="find-prev" title="Previous (Shift+Enter)" aria-label="Previous match">▲</button>
+    <button id="find-next" title="Next (Enter)" aria-label="Next match">▼</button>
+    <button id="find-close" title="Close (Esc)" aria-label="Close find bar">✕</button>
   </div>
 
   <!-- ============== Content area (webviews) ============== -->
-  <div class="content" id="content"></div>
+  <div class="content" id="content" aria-live="polite"></div>
 
   <!-- ============== Sidebar panels ============== -->
   <aside class="sidebar hidden" id="sidebar" aria-label="Browser panel">
     <header class="sidebar-header">
       <h2 id="sidebar-title">Panel</h2>
-      <button id="sidebar-close">✕</button>
+      <button id="sidebar-close" aria-label="Close panel">✕</button>
     </header>
     <div class="sidebar-body" id="sidebar-body"></div>
   </aside>
@@ -88,6 +89,7 @@
   <div class="menu-dropdown hidden" id="menu-dropdown">
     <button data-action="new-tab">New Tab<span class="kbd">Ctrl+T</span></button>
     <button data-action="new-private">New Private Tab<span class="kbd">Ctrl+Shift+P</span></button>
+    <button data-action="open-file">Open Local File<span class="kbd">Ctrl+O</span></button>
     <div class="menu-sep"></div>
     <button data-action="find">Find in Page<span class="kbd">Ctrl+F</span></button>
     <button data-action="downloads">Downloads<span class="kbd">Ctrl+J</span></button>
