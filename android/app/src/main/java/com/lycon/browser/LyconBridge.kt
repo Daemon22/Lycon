@@ -87,6 +87,14 @@ class LyconBridge(
         "window:minimize" to { _ -> onWindowMinimize(); true },
         "window:maximize" to { _ -> onWindowMaximize(); true },
         "window:close" to { _ -> onWindowClose(); true },
+        "local:chooseFile" to { _ ->
+            // The shared renderer fallback opens an Android-compatible file input.
+            JSONObject.NULL
+        },
+        "local:resolvePath" to { payload ->
+            val input = payload?.optString("input")?.trim() ?: ""
+            if (input.startsWith("file://", ignoreCase = true) || input.startsWith("content://", ignoreCase = true)) input else JSONObject.NULL
+        },
         "shell:openExternal" to { payload ->
             val url = payload?.toString() ?: ""
             if (url.isNotEmpty()) {
