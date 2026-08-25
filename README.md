@@ -61,7 +61,8 @@ lycon-browser/
 │   ├── js/                    # UI modules (state/tabs/nav/shields/agents/...)
 │   ├── styles/                # CSS (themes/main/tabs)
 │   └── assets/
-│       ├── wolf-logo.png      # Supplied Lycon wolf identity artwork
+│       ├── wolf-logo.png      # Compact 256px UI derivative of the exact supplied artwork
+│       ├── wolf-logo-original.png # Exact supplied source artwork
 │       └── brands/             # Locally bundled authentic service SVG marks
 │
 ├── windows/                   # WinUI 3 + WebView2 project
