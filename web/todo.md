@@ -27,3 +27,13 @@
 - [x] Wire native download buttons to verified release assets or release pages.
 - [x] Validate behavior, responsive layouts, accessibility, and production build.
 - [x] Push the upgrade to the Lycon main repository.
+
+## Browser workspace redesign
+
+- [x] Define visible browser-critical controls and hidden secondary controls.
+- [x] Move settings, history, downloads, and tools behind a browser menu or panels.
+- [x] Add Hunter Shields controls for ad and tracker blocking states.
+- [x] Add private-tab creation with clear non-persistent behavior.
+- [x] Preserve local-first paths, optional intelligence, and explicit egress messaging.
+- [x] Validate desktop/mobile layouts and interaction states.
+- [x] Save the refined browser workspace checkpoint.

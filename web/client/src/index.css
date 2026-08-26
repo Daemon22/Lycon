@@ -244,3 +244,31 @@ h1 em { color: #d4a574; font-style: normal; }
 .status-pending { color: #d4a574; background: rgba(212,165,116,.12); }
 [data-theme="light"] .release-status { border-color: rgba(61,43,29,.16); color: #695b4c; background: rgba(255,255,255,.64); }
 @media (max-width: 620px) { .release-status { align-items: flex-start; flex-wrap: wrap; } .release-status > a { margin-left: 31px; } }
+
+/* Hunter Browser workspace: browser-critical chrome stays visible; secondary functions live in compact anchored panels. */
+.browser-product-state { display: inline-flex; align-items: center; gap: 7px; color: #8f7e6d; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.browser-product-state .kicker-dot { width: 5px; height: 5px; }
+.browser-menu, .shields-panel { position: absolute; z-index: 80; top: 60px; right: 14px; width: min(300px, calc(100vw - 28px)); padding: 9px; border: 1px solid rgba(212,165,116,.2); border-radius: 9px; background: #241a13; box-shadow: 0 20px 45px rgba(0,0,0,.34); }
+.browser-menu { display: grid; gap: 2px; }
+.browser-menu button, .browser-menu a { display: flex; align-items: center; gap: 11px; min-height: 38px; padding: 0 10px; border: 0; border-radius: 6px; color: #d7c5ae; background: transparent; font-size: 12px; text-align: left; text-decoration: none; }
+.browser-menu button:hover, .browser-menu a:hover { color: #fff7ec; background: rgba(212,165,116,.1); }
+.browser-menu button svg, .browser-menu a svg { color: #d4a574; }
+.browser-menu kbd { margin-left: auto; color: #776957; font-size: 10px; }
+.menu-divider { height: 1px; margin: 6px 5px; background: rgba(212,165,116,.13); }
+.shields-panel { right: 52px; padding: 14px; }
+.panel-title { display: flex; align-items: center; justify-content: space-between; color: #f8f0e5; font-size: 12px; font-weight: 700; }
+.panel-title span { display: inline-flex; align-items: center; gap: 8px; }
+.panel-title span svg { color: #56b5a6; }
+.panel-title button { display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 5px; color: #8f7e6d; background: transparent; }
+.panel-title button:hover { color: #f8f0e5; background: rgba(212,165,116,.1); }
+.shields-panel p { margin: 10px 0 14px; color: #9b8b79; font-size: 11px; line-height: 1.55; }
+.shields-panel label { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid rgba(212,165,116,.1); }
+.shields-panel label span { display: grid; gap: 3px; }
+.shields-panel label strong { color: #d7c5ae; font-size: 11px; }
+.shields-panel label small { color: #776957; font-size: 10px; }
+.shields-panel input { width: 33px; height: 18px; accent-color: #56b5a6; }
+.shield-summary { display: flex; align-items: center; gap: 7px; margin-top: 11px; padding-top: 11px; border-top: 1px solid rgba(212,165,116,.1); color: #56b5a6; font-size: 10px; }
+.private-tab::after { content: ""; width: 5px; height: 5px; margin-left: auto; border-radius: 50%; background: #9b68d8; }
+[data-theme="light"] .browser-menu, [data-theme="light"] .shields-panel { background: #fffdf8; border-color: rgba(61,43,29,.16); box-shadow: 0 20px 45px rgba(61,43,29,.16); }
+[data-theme="light"] .browser-menu button, [data-theme="light"] .browser-menu a, [data-theme="light"] .shields-panel label strong, [data-theme="light"] .panel-title { color: #3d2b1d; }
+@media (max-width: 620px) { .browser-product-state { display: none; } .browser-menu { top: 53px; right: 8px; } .shields-panel { top: 112px; right: 8px; } }
