@@ -235,3 +235,17 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add a Voice settings test phrase control for microphone and language verification.
 - [x] Add a South African English offline Vosk catalog entry and selection workflow.
 - [x] Validate voice preflight, test phrase, catalog behavior, and responsive settings, then save a checkpoint.
+
+## Full Validation and Opt-in Sync
+
+- [x] Test desktop, tablet, and mobile layouts plus keyboard and screen-reader semantics; fix regressions.
+- [x] Add automated unit tests for browser voice availability and the South African English Vosk catalog.
+- [x] Choose a backend sync route before enabling server/database behavior, keeping sync opt-in and local-first.
+- [x] Implement conflict-safe sync after architecture approval, then validate and save a checkpoint.
+
+## Managed Account Sync
+
+- [x] Upgrade Lycon to the managed full-stack project with built-in authentication and database support.
+- [x] Add opt-in sync settings and an authenticated local-data sync contract.
+- [x] Implement conflict-safe synchronization without replacing local-first state.
+- [x] Run full tests and responsive/accessibility validation, then save a checkpoint.

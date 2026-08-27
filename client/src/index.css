@@ -256,6 +256,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .voice-pack-card { border-color: hsl(var(--primary) / .18); }
 .pack-ready { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 9px; color: hsl(var(--primary)); font: 10px var(--font-mono); letter-spacing: .04em; }
 .voice-pack-card > .primary-btn { margin-top: 13px; }
+.sync-card { margin-top: 22px; padding: 13px; border: 1px solid hsl(var(--primary) / .2); border-radius: 8px; background: hsl(var(--primary) / .05); }
+.sync-card > div:first-child strong { display: block; color: hsl(var(--foreground)); font-size: 12px; }
+.sync-card > div:first-child p { margin: 5px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.55; }
+.sync-status { display: inline-flex; margin-top: 10px; color: hsl(var(--primary)); font: 10px var(--font-mono); letter-spacing: .04em; }
+.sync-card .setting-toggle { margin-top: 12px; }
+@media (max-width: 680px) { .sync-card { padding: 11px; } .sync-card .backup-actions { align-items: stretch; } }
 .voice-test { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 18px; padding: 13px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--secondary) / .18); }
 .voice-test strong { display: block; color: hsl(var(--foreground)); font-size: 12px; }
 .voice-test p { margin: 5px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.5; }
