@@ -148,3 +148,10 @@ The canonical LYCON logo is consistently used in the sidebar brand lockup across
 ### Final UI consistency validation note
 
 Desktop and narrow mobile captures confirm the canonical LYCON logo is used consistently in the sidebar brand lockup, the forest background is applied as a subdued shared atmosphere across Start, Search, History, and Settings, and the refined chrome/content separation remains readable without overflow.
+
+## Search Filters and Privacy Controls
+
+- [x] Add Saved, History, Documents, and Core filters to native Lycon Search.
+- [x] Add a browser-level privacy notice explaining local indexing and microphone permissions.
+- [x] Keep clear browsing history available and add individual delete actions for saved pages.
+- [x] Validate filtering, privacy messaging, and granular data controls, then save a checkpoint.
