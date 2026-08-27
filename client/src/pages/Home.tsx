@@ -33,7 +33,7 @@ import {
 type View = "start" | "bookmarks" | "history" | "downloads" | "settings" | "online";
 type Theme = "light" | "dark";
 type PageKind = "local" | "online" | "search" | "file";
-type SettingsSection = "appearance" | "privacy" | "search";
+type SettingsSection = "appearance" | "privacy" | "search" | "permissions";
 
 type Tab = {
   id: number;
@@ -64,6 +64,8 @@ type SettingsState = {
   searchEngine: string;
   shieldsEnabled: boolean;
   startupView: "start" | "last";
+  microphonePermission: "ask" | "allow" | "block";
+  locationPermission: "ask" | "block";
 };
 
 const initialHistory: HistoryItem[] = [
@@ -72,11 +74,8 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday" },
 ];
 
-const navItems: Array<{ view: View; label: string; icon: LucideIcon; count?: number }> = [
+const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
   { view: "start", label: "Start", icon: HomeIcon },
-  { view: "bookmarks", label: "Bookmarks", icon: Bookmark },
-  { view: "history", label: "History", icon: History, count: 3 },
-  { view: "downloads", label: "Downloads", icon: Download },
 ];
 
 const defaultSettings: SettingsState = {
@@ -84,6 +83,8 @@ const defaultSettings: SettingsState = {
   searchEngine: "DuckDuckGo",
   shieldsEnabled: true,
   startupView: "start",
+  microphonePermission: "ask",
+  locationPermission: "ask",
 };
 
 function readStorage<T>(key: string, fallback: T): T {
@@ -150,6 +151,7 @@ export default function Home() {
   const [onlineOpened, setOnlineOpened] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
   const [toast, setToast] = useState("");
+  const [overflowOpen, setOverflowOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
@@ -187,6 +189,7 @@ export default function Home() {
 
   const navigateTo = (destination: PageRecord) => {
     const nextView = destination.view ?? "online";
+    setOverflowOpen(false);
     setCurrentView(nextView);
     window.history.pushState({}, "", routePath(nextView));
     setActivePage(destination);
@@ -272,6 +275,8 @@ export default function Home() {
   };
 
   const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => setSettings((previous) => ({ ...previous, [key]: value }));
+  const openSettingsSection = (section: SettingsSection) => { setSettingsSection(section); navigateTo({ title: "Settings", url: "lycon://settings", kind: "local", view: "settings" }); };
+  const clearBrowsingData = () => { setHistoryEntries([]); setDownloads([]); showToast("History and downloads cleared"); setOverflowOpen(false); };
 
   return (
     <div className="lycon-app">
@@ -281,11 +286,9 @@ export default function Home() {
           <div className="brand-copy"><strong>LYCON</strong><span>LOCAL BY DEFAULT</span></div>
         </div>
         <div className="side-label">LIBRARY</div>
-        <nav className="side-nav" aria-label="Library">
-          {navItems.map(({ view, label, icon: Icon, count }) => <button key={view} className={`nav-item ${currentView === view ? "active" : ""}`} onClick={() => navigateView(view)} aria-current={currentView === view ? "page" : undefined}><Icon size={15} /><span>{label}</span>{count ? <b>{historyEntries.length || count}</b> : null}</button>)}
+        <nav className="side-nav" aria-label="Primary browser navigation">
+          {navItems.map(({ view, label, icon: Icon }) => <button key={view} className={`nav-item ${currentView === view ? "active" : ""}`} onClick={() => navigateView(view)} aria-current={currentView === view ? "page" : undefined}><Icon size={15} /><span>{label}</span></button>)}
         </nav>
-        <div className="side-label side-label-control">CONTROL ROOM</div>
-        <button className={`nav-item ${currentView === "settings" ? "active" : ""}`} onClick={() => navigateView("settings")}><Settings size={15} /><span>Settings</span></button>
         <div className="sidebar-footnote"><span className="status-line"><CircleDot size={9} /> Local mode</span><p>Your library lives here. Online pages wait for your deliberate handoff.</p></div>
       </aside>
 
@@ -295,7 +298,7 @@ export default function Home() {
             {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(page.kind === "local" ? "" : page.url); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
-          <div className="window-actions"><button className="icon-btn" onClick={() => showToast("More browser actions are coming soon")} aria-label="More actions"><MoreHorizontal size={17} /></button></div>
+          <div className="window-actions"><button className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={clearBrowsingData} /> : null}</div>
         </div>
         <div className="toolbar">
           <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
@@ -372,9 +375,13 @@ function DownloadsView({ downloads, onPick }: { downloads: string[]; onPick: () 
   return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file, index) => <div className="list-row" key={`${file}-${index}`}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file}</strong><span>Local file · ready to open</span></div><span className="row-meta">LOCAL</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
 }
 
+function OverflowMenu({ onNavigate, onSettings, onClearData }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void }) {
+  return <div className="overflow-menu" role="menu" aria-label="Browser menu"><div className="overflow-heading">MORE <span>Browser controls</span></div><button role="menuitem" onClick={() => onNavigate("bookmarks")}><Bookmark size={15} />Saved pages</button><button role="menuitem" onClick={() => onNavigate("history")}><History size={15} />History</button><button role="menuitem" onClick={() => onNavigate("downloads")}><Download size={15} />Downloads</button><div className="overflow-divider" /><button role="menuitem" onClick={() => onSettings("appearance")}><Settings size={15} />Settings</button><button role="menuitem" onClick={() => onSettings("privacy")}><ShieldCheck size={15} />Privacy &amp; security</button><button role="menuitem" onClick={() => onSettings("permissions")}><LockKeyhole size={15} />Site permissions</button><div className="overflow-divider" /><button role="menuitem" className="danger-item" onClick={onClearData}><Trash2 size={15} />Clear browsing data</button></div>;
+}
+
 function SettingsView({ settings, section, setSection, updateSetting }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
-  const settingNav: Array<{ id: SettingsSection; label: string; icon: LucideIcon }> = [{ id: "appearance", label: "Appearance", icon: Palette }, { id: "privacy", label: "Privacy", icon: ShieldCheck }, { id: "search", label: "Search", icon: Search }];
-  return <div className="page settings-page"><PageHeading eyebrow="CONTROL ROOM / SETTINGS" title="Settings" description="Keep the browser’s posture in your hands." /><div className="settings-layout"><div className="settings-nav">{settingNav.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</div><div className="settings-card">{section === "appearance" && <><SettingHeader title="Appearance" copy="Choose how the field looks when you return." /><SettingSelect label="Theme" value={settings.theme} options={[{ value: "dark", label: "Night watch" }, { value: "light", label: "Day field" }]} onChange={(value) => updateSetting("theme", value as Theme)} /><SettingSelect label="Startup view" value={settings.startupView} options={[{ value: "start", label: "Start page" }, { value: "last", label: "Last active view" }]} onChange={(value) => updateSetting("startupView", value as "start" | "last")} /></>}{section === "privacy" && <><SettingHeader title="Privacy" copy="Make the local boundary visible and easy to adjust." /><SettingToggle label="Shields" copy="Keep known trackers and noisy requests at a distance." checked={settings.shieldsEnabled} onChange={(checked) => updateSetting("shieldsEnabled", checked)} /><SettingToggle label="Private tabs" copy="Keep this session out of the standard local trace." checked={activeBoolean(false)} onChange={() => undefined} /></>}{section === "search" && <><SettingHeader title="Search" copy="Decide which engine receives searches you intentionally hand off." /><SettingSelect label="Search engine" value={settings.searchEngine} options={[{ value: "DuckDuckGo", label: "DuckDuckGo" }, { value: "Google", label: "Google" }]} onChange={(value) => updateSetting("searchEngine", value)} /></>}</div></div></div>;
+  const settingNav: Array<{ id: SettingsSection; label: string; icon: LucideIcon }> = [{ id: "appearance", label: "Appearance", icon: Palette }, { id: "privacy", label: "Privacy", icon: ShieldCheck }, { id: "permissions", label: "Permissions", icon: LockKeyhole }, { id: "search", label: "Search", icon: Search }];
+  return <div className="page settings-page"><PageHeading eyebrow="CONTROL ROOM / SETTINGS" title="Settings" description="Keep the browser’s posture in your hands." /><div className="settings-layout"><div className="settings-nav">{settingNav.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</div><div className="settings-card">{section === "appearance" && <><SettingHeader title="Appearance" copy="Choose how the field looks when you return." /><SettingSelect label="Theme" value={settings.theme} options={[{ value: "dark", label: "Night watch" }, { value: "light", label: "Day field" }]} onChange={(value) => updateSetting("theme", value as Theme)} /><SettingSelect label="Startup view" value={settings.startupView} options={[{ value: "start", label: "Start page" }, { value: "last", label: "Last active view" }]} onChange={(value) => updateSetting("startupView", value as "start" | "last")} /></>}{section === "privacy" && <><SettingHeader title="Privacy" copy="Make the local boundary visible and easy to adjust." /><SettingToggle label="Shields" copy="Keep known trackers and noisy requests at a distance." checked={settings.shieldsEnabled} onChange={(checked) => updateSetting("shieldsEnabled", checked)} /><SettingToggle label="Private tabs" copy="Keep this session out of the standard local trace." checked={activeBoolean(false)} onChange={() => undefined} /></>}{section === "permissions" && <><SettingHeader title="Site permissions" copy="Keep microphone and location requests explicit." /><SettingSelect label="Microphone" value={settings.microphonePermission} options={[{ value: "ask", label: "Ask every time" }, { value: "allow", label: "Allow" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("microphonePermission", value as SettingsState["microphonePermission"])} /><SettingSelect label="Location" value={settings.locationPermission} options={[{ value: "ask", label: "Ask every time" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("locationPermission", value as SettingsState["locationPermission"])} /></>}{section === "search" && <><SettingHeader title="Search" copy="Decide which engine receives searches you intentionally hand off." /><SettingSelect label="Search engine" value={settings.searchEngine} options={[{ value: "DuckDuckGo", label: "DuckDuckGo" }, { value: "Google", label: "Google" }]} onChange={(value) => updateSetting("searchEngine", value)} /></>}</div></div></div>;
 }
 
 function activeBoolean(value: boolean) { return value; }
