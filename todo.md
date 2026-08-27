@@ -8,4 +8,13 @@
 
 ### Validation note
 
+The current Start hero uses the forest background as its sole large visual. The wolf mark appears only in the sidebar brand lockup, matching the supplied reference and removing repetition.
+
+
 Desktop and mobile screenshots confirm the forest background resolves correctly, the hero text remains readable, the wolf badge remains identifiable, and the microphone control remains visible in the responsive search field. Secondary settings and library views remain distinct from the hero.
+
+## Hero Mark De-duplication
+
+- [x] Remove the wolf artwork from the Start hero while keeping the sidebar brand mark.
+- [x] Rebalance the forest background and hero content after removing the artwork.
+- [x] Validate desktop and mobile composition and save a new publish-ready checkpoint.
