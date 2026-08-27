@@ -15,3 +15,9 @@ The overflow menu opened from the top-right three-dot control and closed when th
 The live preview created a second Start tab through the top New tab control, confirming the sidebar-free tab strip remains interactive after the shell simplification. The tab model is now stored through the existing local persistence hook, with active-tab identity and ordering included in the persisted state.
 
 Reload verification passed: the refreshed live preview still showed both Start tabs. The local storage payload contained both tab records and the active-tab identifier, confirming open tabs and active selection survive reload without a server.
+
+## Voice modes and Vosk pack validation
+
+The live Settings control room now exposes a Voice section with Online browser recognition, On-device browser recognition, and Offline Vosk language pack modes. The optional English small pack is presented as a separate 40 MB download and is not part of the initial application bundle. The main voice button receives the selected on-device preference, while the browser-native engine remains the lightweight base path.
+
+Final verification passed: Settings exposes the Voice section with online, browser on-device, and offline Vosk modes. Selecting Offline Vosk updates the explanatory panel without initiating a download; the user must explicitly select Download offline pack. The workflow fetches the official small English archive and stores it in IndexedDB, with persisted ready/removal state. Favicon components use a localStorage data-URL cache when cross-origin fetch permits and fall back to the source URL when it does not.

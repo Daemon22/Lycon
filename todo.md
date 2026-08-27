@@ -215,3 +215,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add dynamic tab titles and favicons derived from local pages, files, and online destinations.
 - [x] Evaluate a lightweight offline/online transcription path and preserve browser-native fallback behavior.
 - [x] Validate adaptive shell behavior, voice fallback, and tab metadata, then save a checkpoint.
+
+## Voice Modes and Local Asset Cache
+
+- [x] Add a Voice settings panel with Online, On-device, and Offline pack modes.
+- [x] Add an opt-in Vosk language-pack download workflow with local availability and removal state.
+- [x] Add local favicon caching with expiration, fallback, and failure handling.
+- [x] Validate voice mode controls, pack workflow, favicon reuse, and responsive layout, then save a checkpoint.

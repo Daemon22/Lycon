@@ -253,6 +253,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .backup-card-heading strong { display: block; color: hsl(var(--foreground)); font-size: 12px; }
 .backup-card-heading p { margin: 5px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.55; }
 .backup-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.voice-pack-card { border-color: hsl(var(--primary) / .18); }
+.pack-ready { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 9px; color: hsl(var(--primary)); font: 10px var(--font-mono); letter-spacing: .04em; }
+.voice-pack-card > .primary-btn { margin-top: 13px; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 20px; background: hsl(255 25% 3% / .66); backdrop-filter: blur(5px); }
 .confirm-dialog { width: min(100%, 420px); display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 18px; border: 1px solid hsl(var(--border)); border-radius: 10px; color: hsl(var(--foreground)); background: hsl(var(--card)); box-shadow: 0 24px 80px hsl(255 25% 3% / .55); animation: toast-in .2s cubic-bezier(.23,1,.32,1) both; }
 .confirm-dialog-icon { width: 31px; height: 31px; display: grid; place-items: center; color: hsl(5 72% 68%); border: 1px solid hsl(5 72% 68% / .35); border-radius: 7px; background: hsl(5 72% 68% / .1); }

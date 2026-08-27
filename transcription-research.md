@@ -13,3 +13,8 @@ Whisper/WebAssembly offers stronger general vocabulary and multilingual robustne
 - [MDN: Using the Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API/Using_the_Web_Speech_API) — documents `processLocally`, `available()`, `install()`, language packs, and on-device recognition.
 - [ccoreilly/vosk-browser](https://github.com/ccoreilly/vosk-browser) — documents the browser WebAssembly/WebWorker approach and explicit model loading.
 - [Whisper: Robust Speech Recognition via Large-Scale Weak Supervision](https://openai.com/index/whisper/) — establishes Whisper’s broad multilingual and multitask training basis, while its model family remains a heavier option for a browser base build.
+
+
+## Official model sizing
+
+The official [Vosk Models](https://alphacephei.com/vosk/models) catalog states that small models are intended for mobile and desktop use, typically around 50 MB and around 300 MB runtime memory, while larger models trade substantial size for accuracy. The catalog lists `vosk-model-small-en-us-0.15` at about 40 MB, making it a reasonable opt-in English pack for Lycon, provided the user understands the separate download and memory trade-off.
