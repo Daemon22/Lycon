@@ -21,3 +21,7 @@ Reload verification passed: the refreshed live preview still showed both Start t
 The live Settings control room now exposes a Voice section with Online browser recognition, On-device browser recognition, and Offline Vosk language pack modes. The optional English small pack is presented as a separate 40 MB download and is not part of the initial application bundle. The main voice button receives the selected on-device preference, while the browser-native engine remains the lightweight base path.
 
 Final verification passed: Settings exposes the Voice section with online, browser on-device, and offline Vosk modes. Selecting Offline Vosk updates the explanatory panel without initiating a download; the user must explicitly select Download offline pack. The workflow fetches the official small English archive and stores it in IndexedDB, with persisted ready/removal state. Favicon components use a localStorage data-URL cache when cross-origin fetch permits and fall back to the source URL when it does not.
+
+## South African English voice validation
+
+The live Voice settings panel now presents English (South Africa) as the selected built-in language, with the standard `en-ZA` tag passed to the browser-native recognizer. Online, on-device, and Offline Vosk modes remain available. If the browser reports `language-not-supported`, recognition retries with the browser language and then reports a clear unavailable-language status rather than failing silently.

@@ -222,3 +222,9 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add an opt-in Vosk language-pack download workflow with local availability and removal state.
 - [x] Add local favicon caching with expiration, fallback, and failure handling.
 - [x] Validate voice mode controls, pack workflow, favicon reuse, and responsive layout, then save a checkpoint.
+
+## South African English Voice
+
+- [x] Add persisted South African English (en-ZA) voice-language selection.
+- [x] Pass en-ZA to the browser-native recognizer and fall back safely when unsupported.
+- [x] Validate the Voice settings surface and recognition language wiring, then save a checkpoint.
