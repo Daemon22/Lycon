@@ -126,3 +126,25 @@ Desktop Search and Downloads surfaces render correctly after the data-model upgr
 ### Full-text responsive validation note
 
 The expanded Search description remains readable on mobile, and the Downloads surface keeps its Add file action and empty state within the viewport without clipping. Document result cards will use the same compact metadata and snippet treatment when local files are indexed.
+
+## Repository Push and Preview Verification
+
+- [x] Confirm the configured Lycon repository remote and current branch.
+- [x] Run final type-check, production build, and targeted smoke checks.
+- [x] Commit and push the latest full-text search changes.
+- [x] Open the updated preview and verify the core search and browsing surfaces.
+
+## UI Consistency and Preview Search Audit
+
+- [x] Audit all Lycon views for canonical logo references, forest background usage, and stale generated assets.
+- [x] Refine shared shell, typography, contrast, spacing, and responsive styling without changing the local-first information architecture.
+- [x] Test native search, saved/local index results, and browsing history in preview.
+- [x] Run final checks and save a revised publish-ready checkpoint.
+
+### UI and preview audit note
+
+The canonical LYCON logo is consistently used in the sidebar brand lockup across Start, Search, History, and Settings. The forest background treatment now carries through every route as a subdued shared atmosphere, while content cards preserve contrast. Preview checks confirm the single-toolbar Search surface, native local index results, and History records remain available and readable.
+
+### Final UI consistency validation note
+
+Desktop and narrow mobile captures confirm the canonical LYCON logo is used consistently in the sidebar brand lockup, the forest background is applied as a subdued shared atmosphere across Start, Search, History, and Settings, and the refined chrome/content separation remains readable without overflow.

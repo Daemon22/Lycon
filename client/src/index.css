@@ -1,4 +1,5 @@
 /* Design system: Quiet Field Instrument — dark plum workspace, signal amber actions, moss local-state cues, violet private states, Space Grotesk + Manrope + DM Mono. */
+/* Lycon visual system: Quiet Field Instrument — one canonical LYCON mark, one woodland atmosphere, restrained amber action language, and readable local-first surfaces across every route. */
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -63,9 +64,9 @@ button:disabled { cursor: not-allowed; opacity: .34; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 
 .lycon-app { min-height: 100vh; display: flex; overflow: hidden; background: hsl(var(--background)); color: hsl(var(--foreground)); }
-.lycon-sidebar { width: 194px; flex: 0 0 194px; display: flex; flex-direction: column; padding: 22px 13px 15px; border-right: 1px solid hsl(var(--border) / .55); background: linear-gradient(180deg, hsl(var(--sidebar)), hsl(var(--sidebar) / .9)), url("/manus-storage/lycon-signal-grid_6567ed93.jpg") center / cover; }
+.lycon-sidebar { width: 194px; flex: 0 0 194px; display: flex; flex-direction: column; padding: 22px 13px 15px; border-right: 1px solid hsl(var(--border) / .65); background: linear-gradient(180deg, hsl(var(--sidebar) / .98), hsl(var(--sidebar) / .94)), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-blend-mode: normal, soft-light; }
 .brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 7px 28px; }
-.brand-mark { width: 37px; height: 37px; object-fit: contain; filter: drop-shadow(0 5px 13px hsl(var(--accent) / .22)); }
+.brand-mark { width: 37px; height: 37px; object-fit: contain; filter: drop-shadow(0 5px 13px hsl(var(--accent) / .3)); }
 .brand-copy { display: grid; gap: 3px; }
 .brand-copy strong { font: 700 14px var(--font-display); letter-spacing: .16em; }
 .brand-copy span { color: hsl(var(--muted-foreground)); font: 8px var(--font-mono); letter-spacing: .08em; }
@@ -81,7 +82,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .sidebar-footnote p { margin: 9px 0 0; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.55; }
 
 .lycon-main { min-width: 0; flex: 1; display: flex; flex-direction: column; }
-.tab-strip { height: 39px; display: flex; align-items: stretch; border-bottom: 1px solid hsl(var(--border) / .65); background: hsl(var(--card) / .44); }
+.tab-strip { height: 39px; display: flex; align-items: stretch; border-bottom: 1px solid hsl(var(--border) / .72); background: hsl(var(--card) / .62); backdrop-filter: blur(16px); }
 .tabs { min-width: 0; flex: 1; display: flex; overflow: hidden; }
 .tab { min-width: 126px; max-width: 210px; display: flex; align-items: center; gap: 7px; padding: 0 10px; color: hsl(var(--muted-foreground)); background: transparent; border-right: 1px solid hsl(var(--border) / .55); font-size: 11px; }
 .tab.active { color: hsl(var(--foreground)); background: hsl(var(--background) / .72); }
@@ -102,7 +103,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .icon-btn:hover { color: hsl(var(--foreground)); background: hsl(var(--secondary)); border-color: hsl(var(--border)); }
 .icon-btn.active { color: hsl(var(--primary)); }
 .icon-btn:active, .primary-btn:active, .secondary-btn:active, .voice-btn:active { transform: scale(.97); }
-.toolbar { min-height: 54px; display: flex; align-items: center; gap: 6px; padding: 8px 13px; border-bottom: 1px solid hsl(var(--border) / .58); background: hsl(var(--card) / .28); }
+.toolbar { min-height: 54px; display: flex; align-items: center; gap: 6px; padding: 8px 13px; border-bottom: 1px solid hsl(var(--border) / .72); background: hsl(var(--card) / .7); backdrop-filter: blur(18px); }
 .address-wrap { min-width: 0; flex: 1; height: 37px; display: flex; align-items: center; gap: 9px; padding: 0 10px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--input)); transition: border-color .18s ease, box-shadow .18s ease; }
 .address-wrap:focus-within { border-color: hsl(var(--primary) / .72); box-shadow: 0 0 0 3px hsl(var(--primary) / .08); }
 .address-input { width: 100%; min-width: 0; border: 0; outline: 0; color: hsl(var(--foreground)); background: transparent; font: 12px var(--font-mono); }
@@ -122,8 +123,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .private-ink { color: hsl(var(--accent)); }
 .muted-ink { color: hsl(var(--muted-foreground)); }
 
-.content-scroll { min-height: 0; flex: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background)), hsl(266 22% 10% / .3)); }
+.content-scroll { min-height: 0; flex: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background) / .96), hsl(266 22% 10% / .82)), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-blend-mode: normal, soft-light; }
 .page { min-height: 100%; padding: clamp(31px, 7vw, 72px) clamp(22px, 6vw, 78px); animation: page-in .25s cubic-bezier(.23,1,.32,1) both; }
+.page:not(.start-page) { position: relative; }
+.page:not(.start-page)::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 82% 0%, hsl(var(--primary) / .08), transparent 34%); }
 .start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-position: center center; }
 .hero { max-width: 1000px; margin: 0 auto; display: block; }
 .hero-copy-wrap { max-width: 700px; }
@@ -165,7 +168,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 @keyframes status-pulse { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .load-progress span, .status-pulse { animation: none; } }
 
-.content-heading { max-width: 950px; margin: 0 auto 29px; display: flex; align-items: end; justify-content: space-between; gap: 25px; padding-bottom: 22px; border-bottom: 1px solid hsl(var(--border) / .62); }
+.content-heading { max-width: 950px; margin: 0 auto 29px; display: flex; align-items: end; justify-content: space-between; gap: 25px; padding-bottom: 22px; border-bottom: 1px solid hsl(var(--border) / .72); }
 .content-heading h1 { margin: 10px 0 8px; font: 600 clamp(30px, 4vw, 48px)/1 var(--font-display); letter-spacing: -.055em; }
 .content-heading p { max-width: 510px; margin: 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.65; }
 .heading-actions { flex: none; }
@@ -188,7 +191,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .settings-nav button { min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 10px; color: hsl(var(--muted-foreground)); border: 1px solid transparent; border-radius: 7px; background: transparent; text-align: left; font-size: 12px; }
 .settings-nav button:hover { color: hsl(var(--foreground)); background: hsl(var(--secondary) / .55); }
 .settings-nav button.active { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .25); background: hsl(var(--primary) / .09); }
-.settings-card { padding: 23px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card) / .48); }
+.settings-card { padding: 23px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card) / .68); box-shadow: 0 18px 42px hsl(255 25% 3% / .16); backdrop-filter: blur(14px); }
 .setting-header { padding-bottom: 19px; border-bottom: 1px solid hsl(var(--border) / .65); }
 .setting-header h2 { margin: 0 0 7px; font: 600 20px var(--font-display); letter-spacing: -.03em; }
 .setting-header p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
