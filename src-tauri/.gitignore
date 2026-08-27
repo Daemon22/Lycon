@@ -1,0 +1,7 @@
+# Tauri native build output
+target/
+
+# Local signing and environment files
+*.key
+*.key.pub
+.env

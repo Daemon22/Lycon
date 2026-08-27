@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Lycon Browser",
+  "version": "1.0.0",
+  "identifier": "com.lycon.browser",
+  "build": {
+    "beforeDevCommand": "pnpm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "pnpm run build",
+    "frontendDist": "../dist/public"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Lycon Browser",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 360,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/64x64.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
+      "icons/icon.ico"
+    ],
+    "category": "Browser",
+    "shortDescription": "A local-first browser for the quiet web.",
+    "longDescription": "Lycon Browser keeps local browsing data in focus and makes online handoffs deliberate."
+  }
+}

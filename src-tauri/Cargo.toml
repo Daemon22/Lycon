@@ -1,0 +1,18 @@
+[package]
+name = "lycon-browser"
+version = "1.0.0"
+description = "Lycon Browser desktop shell"
+authors = ["Uviwe Menyiwe"]
+edition = "2021"
+rust-version = "1.77.2"
+build = "build.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

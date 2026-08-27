@@ -249,3 +249,11 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add opt-in sync settings and an authenticated local-data sync contract.
 - [x] Implement conflict-safe synchronization without replacing local-first state.
 - [x] Run full tests and responsive/accessibility validation, then save a checkpoint.
+
+## Canonical Frontend, Backend Merge, and Tauri Desktop
+
+- [x] Inventory the latest canonical frontend, strongest backend commits, GitHub branches, and current desktop packaging state.
+- [x] Reconcile the latest frontend with the strongest backend without overwriting or deleting history.
+- [x] Apply the canonical LYCON logo consistently to web metadata and Tauri icon assets.
+- [x] Scaffold a Tauri desktop target without Electron and document required local build prerequisites.
+- [x] Validate web layout, backend contracts, icon references, and Tauri configuration; review old GitHub branches before any deletion.
