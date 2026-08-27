@@ -21,3 +21,7 @@ The dedicated History route renders persisted local records with visit counts, l
 ## Expanded menu surfaces
 
 The live Settings route now exposes Appearance, Privacy, Permissions, Search, Tabs, Extensions, Passwords, Translate, More tools, and Help. The Tabs surface renders a local tab/window status panel, confirming Tab groups no longer falls into a dead-end toast. History continues to render as its own locally retrieved interface.
+
+## Shell layering and responsive visual validation
+
+The refreshed desktop preview shows the three-dot overflow menu positioned above the welcome page with a contained panel, visible menu rows, and no background bleed-through. The Starter tab now has a distinct rounded active surface, amber inset indicator, dedicated close affordance, and a separated new-tab control. Desktop History and Settings remain visually coherent with the updated browser chrome.

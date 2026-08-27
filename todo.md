@@ -184,3 +184,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add working surfaces for tab/window actions, tab groups, extensions/passwords entry points, translate, split view, screenshot, find-on-page, settings, help, and close-tab behavior.
 - [x] Document only the functions intentionally excluded because they require native browser privileges or a backend service.
 - [x] Validate the expanded menu against the reference on desktop and mobile, then save a checkpoint.
+
+## Browser Shell UI Refinement
+
+- [x] Fix overflow-menu stacking so it renders above the welcome page and remains inside the viewport.
+- [x] Refine the Starter tab geometry, active state, close affordance, and new-tab control.
+- [x] Harden desktop, tablet, and mobile toolbar, menu, sidebar, and content behavior.
+- [x] Validate the updated shell visually at representative device widths, then save a checkpoint.
