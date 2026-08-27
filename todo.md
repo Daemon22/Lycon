@@ -257,3 +257,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Apply the canonical LYCON logo consistently to web metadata and Tauri icon assets.
 - [x] Scaffold a Tauri desktop target without Electron and document required local build prerequisites.
 - [x] Validate web layout, backend contracts, icon references, and Tauri configuration; review old GitHub branches before any deletion.
+
+## Releases, Sync Status, and Theme
+
+- [x] Add a GitHub Actions workflow to build Tauri releases for Windows, macOS, and Linux on version tags.
+- [x] Add a visible toolbar sync-status indicator for off, syncing, synced, and conflict/error states.
+- [x] Add a persisted dark/light mode toggle in Settings without changing the current layout.
+- [x] Validate the workflow configuration, sync indicator states, theme toggle, and responsive presentation, then save a checkpoint.

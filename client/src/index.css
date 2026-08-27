@@ -134,6 +134,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .voice-btn.listening svg { animation: mic-pulse 1.1s ease-in-out infinite; }
 .console-signal { height: 27px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); font: 9px var(--font-mono); letter-spacing: .11em; }
 .console-signal-dot, .status-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+.sync-indicator { height: 27px; min-width: 64px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; border: 1px solid hsl(var(--border)); border-radius: 6px; color: hsl(var(--muted-foreground)); font: 9px var(--font-mono); letter-spacing: .09em; transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.sync-indicator-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+.sync-off { color: hsl(var(--muted-foreground)); }
+.sync-syncing { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .45); background: hsl(var(--primary) / .08); }
+.sync-syncing .sync-indicator-dot { animation: sync-pulse 1s ease-in-out infinite; }
+.sync-synced { color: hsl(140 53% 62%); border-color: hsl(140 53% 62% / .35); background: hsl(140 53% 62% / .07); }
+.sync-attention { color: hsl(8 80% 68%); border-color: hsl(8 80% 68% / .35); background: hsl(8 80% 68% / .07); }
 .signal-local { color: hsl(140 53% 62%); }
 .signal-online { color: hsl(var(--primary)); }
 .signal-private { color: hsl(var(--accent)); }
@@ -324,6 +331,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .tablet-compact-toolbar .address-wrap { height: 34px; gap: 7px; padding-inline: 8px; }
   .tablet-compact-toolbar .voice-btn { width: 28px; height: 28px; }
   .tablet-compact-toolbar .console-signal { padding-inline: 7px; font-size: 8px; }
+  .tablet-compact-toolbar .sync-indicator { min-width: 58px; padding-inline: 6px; font-size: 8px; }
 }
 
 @media (max-width: 800px) {
@@ -337,6 +345,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .side-label-control::before { content: ""; display: block; padding-top: 15px; }
   .toolbar { padding: 8px 10px; }
   .console-signal { display: none; }
+  .sync-indicator { min-width: 28px; width: 28px; padding: 0; }
+  .sync-indicator-label { display: none; }
   .start-page { padding-top: 38px; }
   .settings-layout { grid-template-columns: 1fr; }
   .settings-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -388,3 +398,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .privacy-notice-actions { width: 100%; justify-content: flex-end; }
   .backup-actions > * { flex: 1; }
 }
+
+@keyframes sync-pulse { 0%, 100% { opacity: .45; transform: scale(.82); } 50% { opacity: 1; transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .sync-syncing .sync-indicator-dot { animation: none; } }
