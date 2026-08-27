@@ -1,39 +1,135 @@
-# Lycon online browser companion tasks
 
-- [x] Reframe the online product copy and navigation as the Lycon browser, not a generic companion site.
-- [x] Add dedicated Windows native application download page/section.
-- [x] Add dedicated Android native application download page/section.
-- [x] Add privacy documentation link in the footer.
-- [x] Add security documentation link in the footer.
-- [x] Implement a light theme toggle matching the native browser’s appearance.
-- [x] Validate responsive layouts, theme switching, download navigation, and production build.
-- [ ] Commit changes and push them to the Lycon main repository.
+## Reference Background Upgrade
 
-## Browser chrome revision
+- [x] Generate a portrait forest hero background with warm amber light and a dark lower vignette.
+- [x] Integrate the background into the Start view without weakening text contrast or hiding the browser shell.
+- [x] Validate the reference-inspired composition on desktop and mobile, including the voice search field.
+- [ ] Save a new publish-ready checkpoint after final validation.
 
-- [x] Move the address/search bar into a persistent browser-style toolbar near the top.
-- [x] Add browser navigation controls and make the page read as a browser surface rather than a marketing hero.
-- [x] Validate the toolbar and address bar at desktop and mobile widths.
-- [x] Save the revised browser interface checkpoint.
+### Validation note
 
-## Functional browser upgrade
+The current Start hero uses the forest background as its sole large visual. The wolf mark appears only in the sidebar brand lockup, matching the supplied reference and removing repetition.
 
-- [x] Inspect GitHub releases and identify signed Windows and Android assets.
-- [x] Define the web browser security boundary for cross-origin navigation and embedding.
-- [x] Implement real tab creation, switching, closing, and active-tab state.
-- [x] Implement per-tab back/forward history and persisted visit history.
-- [x] Add bookmarks, keyboard shortcuts, and browser-style navigation feedback.
-- [x] Add browser voice input with graceful unsupported-browser handling.
-- [x] Wire native download buttons to verified release assets or release pages.
-- [x] Validate behavior, responsive layouts, accessibility, and production build.
-- [x] Push the upgrade to the Lycon main repository.
 
-## Browser workspace redesign
+Desktop and mobile screenshots confirm the forest background resolves correctly, the hero text remains readable, the wolf badge remains identifiable, and the microphone control remains visible in the responsive search field. Secondary settings and library views remain distinct from the hero.
 
-- [x] Define visible browser-critical controls and hidden secondary controls.
-- [x] Move settings, history, downloads, and tools behind a browser menu or panels.
-- [x] Add Hunter Shields controls for ad and tracker blocking states.
-- [x] Add private-tab creation with clear non-persistent behavior.
-- [x] Preserve local-first paths, optional intelligence, and explicit egress messaging.
-- [x] Validate desktop/mobile layouts and interaction states.
-- [x] Save the refined browser workspace checkpoint.
+## Hero Mark De-duplication
+
+- [x] Remove the wolf artwork from the Start hero while keeping the sidebar brand mark.
+- [x] Rebalance the forest background and hero content after removing the artwork.
+- [x] Validate desktop and mobile composition and save a new publish-ready checkpoint.
+
+## Canonical Logo Replacement
+
+- [x] Replace the generated crest reference with the user-supplied LYCON logo asset.
+- [x] Update favicon and brand lockup references without changing the forest hero background.
+- [x] Validate logo quality at desktop and mobile sizes, then save a new publish-ready checkpoint.
+
+### Canonical logo validation note
+
+The supplied high-resolution LYCON logo now appears in the sidebar brand lockup and favicon reference. Desktop and mobile screenshots show the correct gold-and-purple mark at readable scale; the forest hero remains free of repeated wolf artwork.
+
+## Pasted Instructions
+
+- [x] Read the supplied pasted instructions and extract the required Lycon changes.
+- [x] Refactor secondary navigation into the upper-right overflow menu while keeping primary browser controls visible.
+- [x] Unify viewport-aware sizing across shell, toolbar, tabs, menus, content pages, and responsive rail behavior.
+- [x] Improve chrome/content separation and restrained contrast without redesigning the existing Start page.
+- [x] Validate tabs, navigation, address/search, voice input, bookmarking, overflow access, privacy controls, and narrow-to-desktop viewports.
+- [ ] Save a revised publish-ready checkpoint.
+
+### Overflow architecture validation note
+
+The desktop browser shell now shows only Start in the left rail. The upper-right overflow menu visibly exposes Saved pages, History, Downloads, Settings, Privacy & security, Site permissions, and Clear browsing data as actual menu actions.
+
+### Secondary navigation validation note
+
+Settings opens from the overflow menu and exposes Appearance, Privacy, Permissions, and Search. History opens from the overflow menu and renders its existing records and Clear history action. The left rail remains limited to Start.
+
+### Core shell validation note
+
+The simplified rail leaves Start as the sole primary sidebar destination. A second Start tab opens successfully, both tab close controls remain visible, and the browser shell keeps its navigation controls, address bar, voice input, bookmark, shields, private mode, and overflow entry points synchronized.
+
+### Cross-view interaction validation note
+
+Typed local navigation from the address bar reaches Bookmarks. The overflow menu opens from the Bookmarks view and Privacy & security routes into Settings with the Privacy section active. Existing shields and private-tab controls remain visible and usable.
+
+### Responsive validation note
+
+Narrow mobile screenshots for Start, Settings, and History show no horizontal overflow or clipped content. Tabs, toolbar controls, address/search fields, voice input, settings navigation, and list panels remain within the available content viewport. The canonical logo stays legible in the compact sidebar brand lockup.
+
+### Data-management validation note
+
+Clear browsing data is reachable from the overflow menu, clears the local history and downloads stores, closes the menu, and provides the visible confirmation “History and downloads cleared.”
+
+### Final synchronization note
+
+Desktop and narrow mobile captures confirm the shell and content remain separated, the Start, Settings, and History pages share the same responsive rules, the simplified rail does not create horizontal overflow, and the forest Start surface stays readable without competing secondary navigation.
+
+## Lycon Search Surface
+
+- [x] Remove the duplicate hero search input and keep only the browser address/search field.
+- [x] Add an in-app Lycon Search results view for ordinary queries.
+- [x] Render direct web destinations inside Lycon’s content viewport instead of opening an external browser.
+- [x] Validate search, tabs, responsive layout, voice input, and in-app handoff behavior, then save a checkpoint.
+
+### Single-search validation note
+
+The Start page now contains no second search input. The toolbar address/search field is the only search surface; submitting “privacy” routes to `/search`, displays Lycon Search results from the internal workspace index, and keeps the shell state LOCAL without contacting an external search engine.
+
+### Internal search and browsing validation note
+
+Lycon now has exactly one search input in the toolbar. Ordinary queries route to the local `/search` index, while direct web addresses route to Lycon’s `/online` handoff surface. Choosing Open inside Lycon renders the destination inside an iframe within the content viewport and does not open a new external browser window; external sites may render blank when they disallow embedding.
+
+### Native search validation note
+
+The Start surface exposes only the toolbar address/search input. Route terms such as “settings” resolve to Lycon’s local Settings page, while ordinary terms such as “privacy” resolve to the internal Lycon Search page with local indexed results and no external search-engine URL.
+
+### Final native-browser validation note
+
+Desktop and mobile captures show one visible address/search field at a time: the browser toolbar field. The Start, native Search, and Settings pages fit within their content viewport with no horizontal overflow. The browser shell keeps tabs, navigation, voice input, bookmark, shields, private mode, and overflow controls visible and synchronized.
+
+## Search Index and Embedded Loading
+
+- [x] Index saved pages and browsing history with clear result types, timestamps, and direct navigation.
+- [x] Add an animated loading/progress state while embedded external pages open.
+- [x] Add a graceful embedded-page error or restriction state.
+- [x] Validate search relevance, loading behavior, and responsive presentation, then save a checkpoint.
+
+### Rich local index validation note
+
+Searching “example” now returns live history records with result type, relative visit time, and destination URL. The results remain inside `/search`, preserve the query in the single toolbar field, and keep the shell in LOCAL mode.
+
+### Saved-page indexing validation note
+
+A direct handoff can be saved from the toolbar bookmark control, which changes to Remove bookmark and shows “Saved to bookmarks.” The saved destination is now available for the richer local index alongside history records.
+
+### Final feature validation note
+
+Searching “example” returns both the saved example.com page and a browsing-history record with category, metadata, and destination URL. Direct example.com handoff renders successfully inside Lycon’s embedded viewport with the “Rendering inside Lycon” state visible; no external browser window is opened.
+
+### Final richer-index validation note
+
+Desktop and mobile captures confirm result cards remain readable with category, timestamp, and URL metadata. The embedded handoff surface remains contained within Lycon’s viewport, with a dedicated in-app status label and responsive action card. No external browser window is used.
+
+## Full-Text Local Index
+
+- [x] Inspect the current download and local document data structures and storage flow.
+- [x] Extract searchable text and metadata from locally stored document/download records without sending data externally.
+- [x] Add document and download matches to Lycon Search with useful snippets and result types.
+- [x] Validate full-text queries, direct result navigation, and responsive result presentation, then save a checkpoint.
+
+### Full-text surface validation note
+
+Desktop Search and Downloads surfaces render correctly after the data-model upgrade. Downloads now have a dedicated Add file entry point, and Search remains a single-field local index surface ready to receive document text and metadata from locally stored files.
+
+### Full-text responsive validation note
+
+The expanded Search description remains readable on mobile, and the Downloads surface keeps its Add file action and empty state within the viewport without clipping. Document result cards will use the same compact metadata and snippet treatment when local files are indexed.
+
+## Repository Push and Preview Verification
+
+- [ ] Confirm the configured Lycon repository remote and current branch.
+- [ ] Run final type-check, production build, and targeted smoke checks.
+- [ ] Commit and push the latest full-text search changes.
+- [ ] Open the updated preview and verify the core search and browsing surfaces.

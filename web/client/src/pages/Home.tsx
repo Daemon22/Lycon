@@ -1,46 +1,450 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, BookOpen, Check, Clock3, FileText, Github, Globe2, HardDrive, History, Home as HomeIcon, LockKeyhole, Menu, Mic, Moon, Network, Plus, RotateCw, Search, Settings2, ShieldCheck, Sparkles, Sun, X, Youtube } from "lucide-react";
-import { useLyconTheme } from "../contexts/LyconThemeContext";
+// Design system: Quiet Field Instrument — the sidebar owns state and library information; the hero stays focused on browsing, voice input, and deliberate handoff.
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bookmark,
+  Check,
+  ChevronRight,
+  CircleDot,
+  Download,
+  ExternalLink,
+  FilePlus2,
+  FolderDown,
+  Globe2,
+  History,
+  Home as HomeIcon,
+  LockKeyhole,
+  Mic,
+  MoreHorizontal,
+  Palette,
+  Plus,
+  RotateCw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  WifiOff,
+  X,
+  EyeOff,
+  type LucideIcon,
+} from "lucide-react";
 
-type Tab = { id: number; url: string; title: string; history: string[]; historyIndex: number; privateMode: boolean };
-type Visit = { url: string; title: string; visitedAt: number };
-type Recognition = { continuous: boolean; interimResults: boolean; lang: string; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; start: () => void; stop: () => void };
-type RecognitionWindow = Window & { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+type View = "start" | "search" | "bookmarks" | "history" | "downloads" | "settings" | "online";
+type Theme = "light" | "dark";
+type PageKind = "local" | "online" | "search" | "file";
+type SettingsSection = "appearance" | "privacy" | "search" | "permissions";
 
-const wolfLogo = "/manus-storage/lycon-wolf-logo_b005ce17.png";
-const HOME_URL = "about:lycon";
-const starterLinks = [
-  { label: "DuckDuckGo", domain: "duckduckgo.com", href: "https://duckduckgo.com", icon: Globe2, tone: "orange" },
-  { label: "YouTube", domain: "youtube.com", href: "https://youtube.com", icon: Youtube, tone: "red" },
-  { label: "Wikipedia", domain: "wikipedia.org", href: "https://wikipedia.org", icon: BookOpen, tone: "paper" },
-  { label: "GitHub", domain: "github.com", href: "https://github.com/Daemon22/Lycon", icon: Github, tone: "ink" },
-  { label: "Reddit", domain: "reddit.com", href: "https://reddit.com", icon: MessageBubble, tone: "orange" },
-  { label: "Hacker News", domain: "news.ycombinator.com", href: "https://news.ycombinator.com", icon: Network, tone: "orange" },
-  { label: "MDN Web Docs", domain: "developer.mozilla.org", href: "https://developer.mozilla.org", icon: FileText, tone: "paper" },
-  { label: "Proton Mail", domain: "proton.me/mail", href: "https://proton.me/mail", icon: LockKeyhole, tone: "violet" },
+type Tab = {
+  id: number;
+  title: string;
+  isPrivate: boolean;
+  history: PageRecord[];
+  historyIndex: number;
+};
+
+type PageRecord = {
+  title: string;
+  url: string;
+  kind: PageKind;
+  view?: View;
+  query?: string;
+};
+
+type BookmarkItem = {
+  id: string;
+  title: string;
+  url: string;
+  kind: PageKind;
+};
+
+type HistoryItem = PageRecord & { id: string; visited: string };
+
+type DownloadItem = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  added: string;
+  content: string;
+};
+
+type SettingsState = {
+  theme: Theme;
+  shieldsEnabled: boolean;
+  startupView: "start" | "last";
+  microphonePermission: "ask" | "allow" | "block";
+  locationPermission: "ask" | "block";
+};
+
+const initialHistory: HistoryItem[] = [
+  { id: "history-1", title: "Lycon Start", url: "lycon://start", kind: "local", view: "start", visited: "Now" },
+  { id: "history-2", title: "Bookmarks", url: "lycon://bookmarks", kind: "local", view: "bookmarks", visited: "Today" },
+  { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday" },
 ];
-function MessageBubble({ size = 21 }: { size?: number }) { return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M20.2 4.8A10.1 10.1 0 0 0 12 2C6.5 2 2 5.9 2 10.7c0 2.8 1.5 5.4 4 7l-.8 3.3 3.4-1.8c1 .3 2.1.5 3.4.5 5.5 0 10-3.9 10-8.7 0-2.3-.7-4.5-1.8-6.2ZM8 11H6v-2h2v2Zm5 0h-2v-2h2v2Zm5 0h-2v-2h2v2Z" /></svg>; }
-function normalizeUrl(value: string) { const clean = value.trim(); if (!clean) return HOME_URL; if (clean === HOME_URL || clean.startsWith("/")) return clean; if (/^(https?:\/\/)/i.test(clean)) return clean; if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(clean)) return `http://${clean}`; return `https://duckduckgo.com/?q=${encodeURIComponent(clean)}`; }
-function titleForUrl(url: string) { if (url === HOME_URL) return "New tab — Lycon"; try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "Lycon Browser"; } }
 
-function BrowserHome({ onNavigate, onBookmark }: { onNavigate: (url: string) => void; onBookmark: (url: string) => void }) {
-  return <div className="browser-home-view"><div className="hero-kicker"><span className="kicker-dot" /> New tab <span className="kicker-line" /></div><div className="hero-mark-wrap"><img className="hero-mark" src={wolfLogo} alt="Lycon wolf mascot" /></div><p className="eyebrow">Privacy-first browsing, with the boundary visible</p><h1>Browse wild.<br /><em>Browse free.</em></h1><p className="hero-copy">Lycon is a local-first browser for the open web. Keep navigation practical, keep sensitive context explicit, and keep the important trail on your device.</p><div className="browser-note"><Search size={14} /><span>DuckDuckGo</span> default search · enter a web address above</div><section className="web-section browser-links-section" aria-labelledby="web-title"><div className="section-heading"><div><span className="section-index">01</span><h2 id="web-title">Your web</h2></div><span>{starterLinks.length} field links</span></div><div className="shortcut-grid">{starterLinks.map((item) => { const Icon = item.icon; return <button key={item.label} className="shortcut-card" type="button" onClick={() => { onNavigate(item.href); onBookmark(item.href); }}><span className={`shortcut-icon ${item.tone}`}><Icon size={20} strokeWidth={2.1} /></span><span className="shortcut-copy"><strong>{item.label}</strong><small>{item.domain}</small></span><ArrowUpRight className="shortcut-arrow" size={15} /></button>; })}</div></section><section className="feature-band browser-feature-band"><div className="section-heading"><div><span className="section-index">02</span><h2>On your device</h2></div><span>Native Lycon</span></div><div className="feature-layout"><article className="local-feature"><div className="feature-icon"><HardDrive size={20} /></div><div><span className="feature-label">Local-first by design</span><h3>Keep the important trail offline.</h3><p>The native Lycon browser opens local paths, supports <code>file://</code> and <code>localhost</code>, and keeps native capabilities on the device where they belong.</p><a className="text-link" href="/download">Get the native browser <ArrowUpRight size={14} /></a></div></article><div className="boundary-stack"><div className="boundary-card"><ShieldCheck size={18} /><div><strong>Hunter’s Posture</strong><span>Hardened, Balanced, or Permissive — you choose the sensitivity.</span></div></div><div className="boundary-card"><Sparkles size={18} /><div><strong>Intelligence is optional</strong><span>Local or cloud connectors are explicit, auditable, and never assumed.</span></div></div></div></div></section></div>;
+const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
+  { view: "start", label: "Start", icon: HomeIcon },
+];
+
+const defaultSettings: SettingsState = {
+  theme: "dark",
+  shieldsEnabled: true,
+  startupView: "start",
+  microphonePermission: "ask",
+  locationPermission: "ask",
+};
+
+function readStorage<T>(key: string, fallback: T): T {
+  try {
+    const stored = window.localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function usePersistedState<T>(key: string, fallback: T) {
+  const [value, setValue] = useState<T>(() => readStorage(key, fallback));
+  useEffect(() => {
+    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* private browsing can reject storage */ }
+  }, [key, value]);
+  return [value, setValue] as const;
+}
+
+function viewFromPath(pathname: string): View {
+  const path = pathname.replace(/^\//, "").toLowerCase();
+  if (["search", "bookmarks", "history", "downloads", "settings", "online"].includes(path)) return path as View;
+  return "start";
+}
+
+function routePath(view: View) {
+  return view === "start" ? "/" : `/${view}`;
+}
+
+function addressForPage(page: PageRecord) {
+  return page.kind === "local" || page.kind === "search" ? page.query ?? "" : page.url;
+}
+
+function createDestination(value: string): PageRecord {
+  const trimmed = value.trim();
+  const localRoutes: Record<string, View> = {
+    start: "start",
+    "lycon://start": "start",
+    bookmarks: "bookmarks",
+    "lycon://bookmarks": "bookmarks",
+    history: "history",
+    "lycon://history": "history",
+    downloads: "downloads",
+    "lycon://downloads": "downloads",
+    settings: "settings",
+    "lycon://settings": "settings",
+  };
+  const normalized = trimmed.toLowerCase().replace(/^\//, "");
+  if (localRoutes[normalized]) return { title: normalized, url: `lycon://${normalized}`, kind: "local", view: localRoutes[normalized] };
+  if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
+    const url = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed;
+    return { title: url.replace(/^https?:\/\//, "").split("/")[0], url, kind: "online" };
+  }
+  return { title: `Search: ${trimmed}`, url: `lycon://search?q=${encodeURIComponent(trimmed)}`, kind: "search", view: "search", query: trimmed };
 }
 
 export default function Home() {
-  const { theme, toggleTheme } = useLyconTheme();
-  const [tabs, setTabs] = useState<Tab[]>([{ id: 1, url: HOME_URL, title: "New tab — Lycon", history: [HOME_URL], historyIndex: 0, privateMode: false }]);
-  const [activeTabId, setActiveTabId] = useState(1); const [address, setAddress] = useState(""); const [history, setHistory] = useState<Visit[]>([]); const [bookmarks, setBookmarks] = useState<string[]>([]); const [showHistory, setShowHistory] = useState(false); const [showMenu, setShowMenu] = useState(false); const [showShields, setShowShields] = useState(false); const [blockAds, setBlockAds] = useState(true); const [blockTrackers, setBlockTrackers] = useState(true); const [notice, setNotice] = useState(""); const [listening, setListening] = useState(false); const addressRef = useRef<HTMLInputElement>(null); const nextTabId = useRef(2);
+  const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
+  const [bookmarks, setBookmarks] = usePersistedState<BookmarkItem[]>("lycon-bookmarks", []);
+  const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory);
+  const [downloads, setDownloads] = usePersistedState<DownloadItem[]>("lycon-downloads", readDownloads());
+  const [tabs, setTabs] = useState<Tab[]>([{ id: 1, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
+  const [activeTabId, setActiveTabId] = useState(1);
+  const [currentView, setCurrentView] = useState<View>(() => viewFromPath(window.location.pathname));
+  const [activePage, setActivePage] = useState<PageRecord>({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
+  const [address, setAddress] = useState("");
+  const [onlineOpened, setOnlineOpened] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
+  const [toast, setToast] = useState("");
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
-  useEffect(() => { try { setHistory(JSON.parse(localStorage.getItem("lycon-history") ?? "[]")); setBookmarks(JSON.parse(localStorage.getItem("lycon-bookmarks") ?? "[]")); setBlockAds(localStorage.getItem("lycon-shields-ads") !== "false"); setBlockTrackers(localStorage.getItem("lycon-shields-trackers") !== "false"); } catch { /* local storage is optional */ } }, []);
-  useEffect(() => { localStorage.setItem("lycon-history", JSON.stringify(history.slice(0, 100))); }, [history]); useEffect(() => { localStorage.setItem("lycon-bookmarks", JSON.stringify(bookmarks)); }, [bookmarks]); useEffect(() => { localStorage.setItem("lycon-shields-ads", String(blockAds)); localStorage.setItem("lycon-shields-trackers", String(blockTrackers)); }, [blockAds, blockTrackers]);
-  useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l") { event.preventDefault(); addressRef.current?.focus(); addressRef.current?.select(); } if (event.altKey && event.key === "ArrowLeft") { event.preventDefault(); goHistory(-1); } if (event.altKey && event.key === "ArrowRight") { event.preventDefault(); goHistory(1); } }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); });
-  function navigate(rawUrl: string, tabId = activeTabId) { const url = normalizeUrl(rawUrl); setTabs((current) => current.map((tab) => { if (tab.id !== tabId) return tab; const nextHistory = tab.history.slice(0, tab.historyIndex + 1); if (nextHistory[nextHistory.length - 1] !== url) nextHistory.push(url); return { ...tab, url, title: titleForUrl(url), history: nextHistory, historyIndex: nextHistory.length - 1 }; })); setAddress(url === HOME_URL ? "" : url); if (url !== HOME_URL && !activeTab.privateMode) setHistory((current) => [{ url, title: titleForUrl(url), visitedAt: Date.now() }, ...current.filter((visit) => visit.url !== url)].slice(0, 100)); setNotice(activeTab.privateMode ? "Private tab: this visit will not be saved to local history." : url.startsWith("http") ? "Loaded in the active tab. Some sites may block embedded views; use Open externally when needed." : "New tab ready."); }
-  function goHistory(direction: -1 | 1) { if (!activeTab) return; const nextIndex = activeTab.historyIndex + direction; if (nextIndex < 0 || nextIndex >= activeTab.history.length) return; const url = activeTab.history[nextIndex]; setTabs((current) => current.map((tab) => tab.id === activeTab.id ? { ...tab, url, title: titleForUrl(url), historyIndex: nextIndex } : tab)); setAddress(url === HOME_URL ? "" : url); }
-  function newTab(privateMode = false) { const id = nextTabId.current++; setTabs((current) => [...current, { id, url: HOME_URL, title: privateMode ? "Private tab — Lycon" : "New tab — Lycon", history: [HOME_URL], historyIndex: 0, privateMode }]); setActiveTabId(id); setAddress(""); setShowHistory(false); setShowMenu(false); setNotice(privateMode ? "Private tab ready. Visits and bookmarks will not be added to local history." : "New tab ready."); }
-  function closeTab(id: number) { if (tabs.length === 1) { setTabs([{ id: 1, url: HOME_URL, title: "New tab — Lycon", history: [HOME_URL], historyIndex: 0, privateMode: false }]); setActiveTabId(1); return; } const remaining = tabs.filter((tab) => tab.id !== id); setTabs(remaining); if (activeTabId === id) setActiveTabId(remaining[Math.max(0, remaining.length - 1)].id); }
-  function handleAddress(event: FormEvent<HTMLFormElement>) { event.preventDefault(); navigate(address); } function toggleBookmark(url = activeTab.url) { if (url === HOME_URL || activeTab.privateMode) { setNotice(activeTab.privateMode ? "Private tabs do not save bookmarks." : "Open a page before bookmarking it."); return; } setBookmarks((current) => current.includes(url) ? current.filter((item) => item !== url) : [url, ...current]); }
-  function startVoice() { const RecognitionCtor = (window as RecognitionWindow).SpeechRecognition ?? (window as RecognitionWindow).webkitSpeechRecognition; if (!RecognitionCtor) { setNotice("Voice input is not available in this browser. Use the address field instead."); return; } const recognition = new RecognitionCtor(); recognition.continuous = false; recognition.interimResults = false; recognition.lang = navigator.language || "en-US"; recognition.onresult = (event) => { const spoken = event.results[0]?.[0]?.transcript ?? ""; setAddress(spoken); navigate(spoken); }; recognition.onend = () => setListening(false); setListening(true); recognition.start(); }
-  const isHome = activeTab.url === HOME_URL; const isBookmarked = bookmarks.includes(activeTab.url) && !activeTab.privateMode;
-  return <main className="trailhead-shell browser-app"><div className="ambient ambient-one" /><div className="ambient ambient-two" /><div className="trailhead-page"><header className="topbar"><a className="mini-brand" href="/" aria-label="Lycon browser home"><img src={wolfLogo} alt="Lycon wolf mark" /><span>L<span className="brand-y">y</span>con</span></a><span className="browser-product-state"><span className="kicker-dot" /> Hunter Browser</span><div className="header-actions"><button className="menu-button" type="button" aria-label="Open browser menu" aria-expanded={showMenu} onClick={() => { setShowMenu((current) => !current); setShowShields(false); }}><Menu size={19} /></button></div></header><section className="tab-strip" aria-label="Browser tabs">{tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${tab.privateMode ? "private-tab" : ""}`} type="button" onClick={() => { setActiveTabId(tab.id); setAddress(tab.url === HOME_URL ? "" : tab.url); }}><span className="tab-favicon"><img src={wolfLogo} alt="" /></span><span>{tab.title}</span>{tabs.length > 1 && <X size={13} onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} />}</button>)}<button className="new-tab" type="button" onClick={() => newTab()} aria-label="New tab"><Plus size={16} /></button><span className="tab-count">{tabs.length} tab{tabs.length === 1 ? "" : "s"}</span></section><div className="browser-toolbar" aria-label="Browser toolbar"><div className="browser-nav-buttons"><button type="button" aria-label="Go back" onClick={() => goHistory(-1)} disabled={!activeTab || activeTab.historyIndex === 0}><ArrowLeft size={14} /></button><button type="button" aria-label="Go forward" onClick={() => goHistory(1)} disabled={!activeTab || activeTab.historyIndex === activeTab.history.length - 1}><ArrowRight size={14} /></button><button type="button" aria-label="Reload page" onClick={() => window.location.reload()}><RotateCw size={14} /></button><a href="/" aria-label="Browser home"><HomeIcon size={14} /></a></div><form className="address-bar" onSubmit={handleAddress} role="search"><LockKeyhole size={14} aria-hidden="true" /><input ref={addressRef} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search or enter web address" aria-label="Search or enter web address" /><button className={`voice-button ${listening ? "listening" : ""}`} type="button" onClick={startVoice} aria-label="Use voice input"><Mic size={14} /></button><button className={`bookmark-button ${isBookmarked ? "saved" : ""}`} type="button" onClick={() => toggleBookmark()} aria-label={isBookmarked ? "Remove bookmark" : "Bookmark page"}><Bookmark size={14} /></button><span className="address-status">{activeTab.privateMode ? "Private" : "Private"}</span></form><button className={`toolbar-tool ${showShields ? "selected" : ""}`} type="button" onClick={() => { setShowShields((current) => !current); setShowMenu(false); }} aria-label="Open Hunter Shields" aria-expanded={showShields}><ShieldCheck size={15} /></button><button className={`toolbar-tool ${showHistory ? "selected" : ""}`} type="button" onClick={() => { setShowHistory((current) => !current); setShowMenu(false); }} aria-label="Show browsing history" aria-expanded={showHistory}><History size={15} /></button></div>{showMenu && <aside className="browser-menu" aria-label="Browser menu"><button type="button" onClick={() => newTab()}><Plus size={16} /><span>New tab</span><kbd>Ctrl T</kbd></button><button type="button" onClick={() => newTab(true)}><LockKeyhole size={16} /><span>New private tab</span><kbd>Ctrl Shift N</kbd></button><div className="menu-divider" /><button type="button" onClick={() => { setShowHistory(true); setShowMenu(false); }}><History size={16} /><span>History</span></button><a href="/download"><ArrowUpRight size={16} /><span>Downloads</span></a><a href="/privacy"><LockKeyhole size={16} /><span>Privacy</span></a><a href="/security"><ShieldCheck size={16} /><span>Security</span></a><div className="menu-divider" /><button type="button" onClick={toggleTheme}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}<span>Switch to {theme === "dark" ? "light" : "dark"} theme</span></button><button type="button" onClick={() => setNotice("Advanced settings are available in the native Lycon browser.")}><Settings2 size={16} /><span>Settings</span></button></aside>}{showShields && <aside className="shields-panel" aria-label="Hunter Shields"><div className="panel-title"><span><ShieldCheck size={16} /> Hunter Shields</span><button type="button" onClick={() => setShowShields(false)} aria-label="Close Shields"><X size={15} /></button></div><p>Lycon’s privacy controls are explicit. Native builds enforce these rules at the network boundary; this online shell keeps the selected posture visible.</p><label><span><strong>Block ads</strong><small>Suppress known advertising requests</small></span><input type="checkbox" checked={blockAds} onChange={(event) => setBlockAds(event.target.checked)} /></label><label><span><strong>Block trackers</strong><small>Limit known cross-site tracking scripts</small></span><input type="checkbox" checked={blockTrackers} onChange={(event) => setBlockTrackers(event.target.checked)} /></label><div className="shield-summary"><Check size={14} /> {blockAds && blockTrackers ? "Full Hunter protection selected" : "Custom protection selected"}</div></aside>}{showHistory && <aside className="history-drawer" aria-label="Browsing history"><div className="history-heading"><span><Clock3 size={15} /> Recent trail</span><button type="button" onClick={() => { setHistory([]); setNotice("Local browsing history cleared."); }}>Clear</button></div>{history.length === 0 ? <p className="empty-history">No visits stored yet. Private-tab visits never appear here.</p> : history.slice(0, 8).map((visit) => <button key={visit.url} className="history-row" type="button" onClick={() => { navigate(visit.url); setShowHistory(false); }}><span className="history-favicon"><Globe2 size={13} /></span><span><strong>{visit.title}</strong><small>{visit.url}</small></span></button>)}</aside>}<div className="console-frame browser-viewport">{isHome ? <BrowserHome onNavigate={navigate} onBookmark={toggleBookmark} /> : <div className="remote-view"><div className="remote-view-head"><span><Globe2 size={16} /> {titleForUrl(activeTab.url)}</span><a href={activeTab.url} target="_blank" rel="noreferrer">Open externally <ArrowUpRight size={14} /></a></div><iframe src={activeTab.url} title={titleForUrl(activeTab.url)} sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts" /><div className="remote-boundary"><ShieldCheck size={16} /><span>Cross-origin sites may block embedded views by policy. Lycon keeps that boundary visible instead of silently proxying the page.</span></div></div>}<p className="sr-status" aria-live="polite">{notice}</p></div><footer className="footer"><span>Lycon Browser v1.0</span><span className="footer-separator">/</span><a href="/download">Downloads</a><span className="footer-separator">/</span><a href="/privacy">Privacy</a><span className="footer-separator">/</span><a href="/security">Security</a><span className="footer-separator">/</span><a href="https://github.com/Daemon22/Lycon" target="_blank" rel="noreferrer">source on GitHub <ArrowUpRight size={12} /></a></footer></div></main>;
+  const shellState = activeTab?.isPrivate ? "private" : activePage.kind === "online" ? "online" : "local";
+  const isBookmarked = bookmarks.some((bookmark) => bookmark.url === activePage.url);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  }, [settings.theme]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const view = viewFromPath(window.location.pathname);
+      setCurrentView(view);
+      if (view !== "online") {
+        setActivePage({ title: view === "start" ? "Start" : view[0].toUpperCase() + view.slice(1), url: `lycon://${view}`, kind: "local", view });
+        setAddress("");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const showToast = (message: string) => setToast(message);
+
+  const updateTab = (patch: Partial<Tab>) => {
+    setTabs((previous) => previous.map((tab) => tab.id === activeTabId ? { ...tab, ...patch } : tab));
+  };
+
+  const navigateTo = (destination: PageRecord) => {
+    const nextView = destination.view ?? "online";
+    setOverflowOpen(false);
+    setCurrentView(nextView);
+    window.history.pushState({}, "", routePath(nextView));
+    setActivePage(destination);
+    setAddress(addressForPage(destination));
+    setOnlineOpened(false);
+    const nextHistory = [...(activeTab?.history ?? []), destination];
+    updateTab({ title: destination.title, history: nextHistory, historyIndex: nextHistory.length - 1 });
+    const nextHistoryEntry: HistoryItem = { ...destination, id: `history-${Date.now()}`, visited: "Just now" };
+    setHistoryEntries((previous) => [nextHistoryEntry, ...previous.filter((item) => item.url !== destination.url)].slice(0, 50));
+  };
+
+  const navigateView = (view: View) => {
+    const titles: Record<View, string> = { start: "Start", search: "Lycon Search", bookmarks: "Bookmarks", history: "History", downloads: "Downloads", settings: "Settings", online: activePage.title };
+    navigateTo({ title: titles[view], url: `lycon://${view}`, kind: view === "online" ? activePage.kind : "local", view });
+  };
+
+  const submitAddress = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (address.trim()) navigateTo(createDestination(address));
+  };
+
+  const navigateBack = () => {
+    if (!activeTab || activeTab.historyIndex <= 0) return;
+    const nextIndex = activeTab.historyIndex - 1;
+    const destination = activeTab.history[nextIndex];
+    updateTab({ historyIndex: nextIndex, title: destination.title });
+    setCurrentView(destination.view ?? "online");
+    window.history.replaceState({}, "", routePath(destination.view ?? "online"));
+    setActivePage(destination);
+    setAddress(addressForPage(destination));
+  };
+
+  const navigateForward = () => {
+    if (!activeTab || activeTab.historyIndex >= activeTab.history.length - 1) return;
+    const nextIndex = activeTab.historyIndex + 1;
+    const destination = activeTab.history[nextIndex];
+    updateTab({ historyIndex: nextIndex, title: destination.title });
+    setCurrentView(destination.view ?? "online");
+    window.history.replaceState({}, "", routePath(destination.view ?? "online"));
+    setActivePage(destination);
+    setAddress(addressForPage(destination));
+  };
+
+  const newTab = () => {
+    const id = Date.now();
+    setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
+    setActiveTabId(id);
+    setCurrentView("start");
+    window.history.pushState({}, "", "/");
+    setActivePage({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
+    setAddress("");
+  };
+
+  const closeTab = (id: number) => {
+    if (tabs.length === 1) return;
+    const remaining = tabs.filter((tab) => tab.id !== id);
+    setTabs(remaining);
+    if (id === activeTabId) setActiveTabId(remaining[remaining.length - 1].id);
+  };
+
+  const togglePrivate = () => {
+    updateTab({ isPrivate: !activeTab?.isPrivate });
+    showToast(activeTab?.isPrivate ? "Private mode off" : "Private mode on");
+  };
+
+  const toggleBookmark = () => {
+    if (activePage.kind === "local") { showToast("Local views are already in your field kit"); return; }
+    if (isBookmarked) {
+      setBookmarks((previous) => previous.filter((bookmark) => bookmark.url !== activePage.url));
+      showToast("Bookmark removed");
+    } else {
+      setBookmarks((previous) => [...previous, { id: `bookmark-${Date.now()}`, title: activePage.title, url: activePage.url, kind: activePage.kind }]);
+      showToast("Saved to bookmarks");
+    }
+  };
+
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const textLike = file.type.startsWith("text/") || ["md", "markdown", "txt", "csv", "json", "html", "htm", "xml", "svg", "log"].includes(extension);
+    let content = "";
+    if (textLike && file.size <= 2_000_000) {
+      try { content = (await file.text()).slice(0, 120_000); } catch { content = ""; }
+    }
+    const item: DownloadItem = { id: `download-${Date.now()}`, name: file.name, type: file.type || extension.toUpperCase() || "Local file", size: file.size, added: "Just now", content };
+    setDownloads((previous) => [item, ...previous].slice(0, 100));
+    showToast(`${file.name} added to downloads${content ? " and indexed" : ""}`);
+    event.target.value = "";
+  };
+
+  const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => setSettings((previous) => ({ ...previous, [key]: value }));
+  const openSettingsSection = (section: SettingsSection) => { setSettingsSection(section); navigateTo({ title: "Settings", url: "lycon://settings", kind: "local", view: "settings" }); };
+  const clearBrowsingData = () => { setHistoryEntries([]); setDownloads([]); showToast("History and downloads cleared"); setOverflowOpen(false); };
+
+  return (
+    <div className="lycon-app">
+      <aside className="lycon-sidebar">
+        <div className="brand-lockup">
+          <img className="brand-mark" src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="Lycon wolf mark" />
+          <div className="brand-copy"><strong>LYCON</strong><span>LOCAL BY DEFAULT</span></div>
+        </div>
+        <div className="side-label">LIBRARY</div>
+        <nav className="side-nav" aria-label="Primary browser navigation">
+          {navItems.map(({ view, label, icon: Icon }) => <button key={view} className={`nav-item ${currentView === view ? "active" : ""}`} onClick={() => navigateView(view)} aria-current={currentView === view ? "page" : undefined}><Icon size={15} /><span>{label}</span></button>)}
+        </nav>
+        <div className="sidebar-footnote"><span className="status-line"><CircleDot size={9} /> Local mode</span><p>Your library lives here. Online pages wait for your deliberate handoff.</p></div>
+      </aside>
+
+      <main className="lycon-main">
+        <div className="tab-strip">
+          <div className="tabs">
+            {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+          </div>
+          <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
+          <div className="window-actions"><button className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={clearBrowsingData} /> : null}</div>
+        </div>
+        <div className="toolbar">
+          <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
+          <button className="icon-btn" onClick={navigateForward} disabled={!activeTab || activeTab.historyIndex >= activeTab.history.length - 1} aria-label="Forward"><ArrowRight size={17} /></button>
+          <button className="icon-btn" onClick={() => showToast("Local page refreshed")} aria-label="Reload local page"><RotateCw size={16} /></button>
+          <form className="address-wrap" onSubmit={submitAddress}>
+            {activeTab?.isPrivate ? <EyeOff size={15} className="private-ink" /> : <LockKeyhole size={14} className={activePage.kind === "local" ? "local-ink" : "online-ink"} />}
+            <input className="address-input" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search locally or enter an address" aria-label="Address and search" />
+            {address ? <button type="button" className="clear-btn" onClick={() => setAddress("")} aria-label="Clear address"><X size={13} /></button> : <Search size={14} className="muted-ink" />}
+            <VoiceInputButton onTranscript={setAddress} onStatus={showToast} />
+          </form>
+          <div className={`console-signal signal-${shellState}`}><span className="console-signal-dot" /><span>{shellState === "private" ? "PRIVATE" : shellState === "online" ? "HANDOFF" : "LOCAL"}</span></div>
+          <button className={`icon-btn ${isBookmarked ? "active" : ""}`} onClick={toggleBookmark} disabled={!activeTab || activePage.view === "start"} aria-label={isBookmarked ? "Remove bookmark" : "Save bookmark"}><Bookmark size={17} fill={isBookmarked ? "currentColor" : "none"} /></button>
+          <button className={`icon-btn ${settings.shieldsEnabled ? "active" : ""}`} onClick={() => updateSetting("shieldsEnabled", !settings.shieldsEnabled)} aria-label="Toggle shields"><ShieldCheck size={17} /></button>
+          <button className="icon-btn" onClick={togglePrivate} aria-label="Toggle private mode"><EyeOff size={17} /></button>
+        </div>
+
+        <div className="content-scroll">
+          {currentView === "start" && <StartView />}
+          {currentView === "search" && <SearchView page={activePage} bookmarks={bookmarks} historyEntries={historyEntries} downloads={downloads} onOpen={(url) => navigateTo(createDestination(url))} />}
+          {currentView === "bookmarks" && <BookmarksView bookmarks={bookmarks} onOpen={(item) => navigateTo(createDestination(item.url))} onRemove={(id) => { setBookmarks((previous) => previous.filter((item) => item.id !== id)); showToast("Bookmark removed"); }} />}
+          {currentView === "history" && <HistoryView entries={historyEntries} onOpen={(entry) => navigateTo(createDestination(entry.url))} onClear={() => { setHistoryEntries([]); showToast("History cleared"); }} />}
+          {currentView === "downloads" && <DownloadsView downloads={downloads} onPick={() => fileInput.current?.click()} />}
+          {currentView === "settings" && <SettingsView settings={settings} section={settingsSection} setSection={setSettingsSection} updateSetting={updateSetting} />}
+          {currentView === "online" && <OnlineView page={activePage} onlineOpened={onlineOpened} onOpen={() => setOnlineOpened(true)} onBack={() => navigateView("start")} />}
+        </div>
+        <input ref={fileInput} type="file" hidden onChange={handleFile} />
+      </main>
+      {toast ? <div className="toast-note" role="status"><Check size={14} />{toast}</div> : null}
+    </div>
+  );
 }
+
+function VoiceInputButton({ onTranscript, onStatus }: { onTranscript: (value: string) => void; onStatus: (message: string) => void }) {
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  useEffect(() => () => { recognitionRef.current?.stop?.(); }, []);
+  const startListening = () => {
+    const speechWindow = window as typeof window & { SpeechRecognition?: new () => any; webkitSpeechRecognition?: new () => any };
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) { onStatus("Voice input is not supported in this browser"); return; }
+    const recognition = new Recognition();
+    recognition.lang = navigator.language || "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => setIsListening(true);
+    recognition.onresult = (event: any) => { const transcript = event.results?.[0]?.[0]?.transcript?.trim(); if (transcript) onTranscript(transcript); };
+    recognition.onerror = (event: any) => { setIsListening(false); onStatus(event.error === "not-allowed" ? "Microphone access was not allowed" : "Voice input could not hear you"); };
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+  return <button type="button" className={`voice-btn ${isListening ? "listening" : ""}`} onClick={startListening} aria-label={isListening ? "Listening" : "Use voice input"} aria-pressed={isListening}><Mic size={15} /></button>;
+}
+
+function StartView() {
+  return <div className="page start-page"><section className="hero"><div className="hero-copy-wrap"><div className="eyebrow">FIELD INSTRUMENT / 01</div><h1>Browse <em>wild.</em><br />Browse free.</h1><p className="hero-copy">A quiet home for the local web. Lycon keeps your own device in focus, then puts you in control when a page needs the wider internet.</p><div className="hero-note"><span><CircleDot size={9} /> Your device, in focus</span><span>Voice-ready</span></div></div></section></div>;
+}
+
+function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string; title: string; description: string; actions?: ReactNode }) {
+  return <div className="content-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{actions ? <div className="heading-actions">{actions}</div> : null}</div>;
+}
+
+function SearchView({ page, bookmarks, historyEntries, downloads, onOpen }: { page: PageRecord; bookmarks: BookmarkItem[]; historyEntries: HistoryItem[]; downloads: DownloadItem[]; onOpen: (url: string) => void }) {
+  const query = page.query ?? page.title.replace(/^Search: /, "");
+  const coreIndex = [{ title: "Start", url: "lycon://start", copy: "The local-first Lycon home surface.", category: "CORE", meta: "Local surface" }, { title: "Saved pages", url: "lycon://bookmarks", copy: "Your locally saved pages and deliberate handoffs.", category: "CORE", meta: "Library" }, { title: "History", url: "lycon://history", copy: "A quiet trace of local visits and handoffs.", category: "CORE", meta: `${historyEntries.length} records` }, { title: "Downloads", url: "lycon://downloads", copy: "Files held in your local field kit.", category: "CORE", meta: "Library" }, { title: "Settings", url: "lycon://settings", copy: "Appearance, privacy, permissions, and search controls.", category: "CORE", meta: "Control room" }];
+  const savedIndex = bookmarks.map((item) => ({ title: item.title, url: item.url, copy: item.kind === "online" ? "Saved online handoff" : "Saved local page", category: "SAVED", meta: "Saved page" }));
+  const historyIndex = historyEntries.map((item) => ({ title: item.title, url: item.url, copy: item.kind === "online" ? "Visited online handoff" : "Visited local surface", category: "HISTORY", meta: item.visited }));
+  const downloadIndex = downloads.map((item) => ({ title: item.name, url: "lycon://downloads", copy: item.content ? excerptAround(item.content, query) : `${item.type} download · metadata indexed locally`, category: "DOCUMENT", meta: `${formatBytes(item.size)} · ${item.added}` }));
+  const matches = [...coreIndex, ...savedIndex, ...historyIndex, ...downloadIndex].filter((item, index, items) => `${item.title} ${item.copy} ${item.url}`.toLowerCase().includes(query.toLowerCase()) && items.findIndex((candidate) => candidate.url === item.url && candidate.title === item.title) === index);
+  const results = matches.length ? matches : [{ title: `No local match for “${query}”`, url: "lycon://start", copy: "Lycon Search only indexes this workspace. Try a page name, saved page, or browser function.", category: "NO MATCH", meta: "Local index" }];
+  return <div className="page library-page search-page"><PageHeading eyebrow="LYCON SEARCH / LOCAL INDEX" title={`Results for “${query}”`} description="Lycon Search indexes this workspace, including saved pages, browsing history, downloads, and extracted document text. Ordinary searches never leave the app." /><div className="search-results">{results.map((result, index) => <button className="search-result" key={result.url + result.title} onClick={() => onOpen(result.url)}><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-body"><strong>{result.title}</strong><span>{result.copy}</span><small>{result.category} · {result.meta} · {result.url}</small></span><ChevronRight size={16} /></button>)}</div></div>;
+}
+
+function BookmarksView({ bookmarks, onOpen, onRemove }: { bookmarks: BookmarkItem[]; onOpen: (item: BookmarkItem) => void; onRemove: (id: string) => void }) {
+  return <div className="page library-page"><PageHeading eyebrow="LIBRARY / SAVED" title="Bookmarks" description="The places you chose to keep close." />{bookmarks.length ? <div className="list-panel">{bookmarks.map((item) => <div className="list-row" key={item.id}><div className="row-icon"><Bookmark size={16} /></div><button className="row-main" onClick={() => onOpen(item)}><strong>{item.title}</strong><span>{item.url}</span></button><button className="icon-btn" onClick={() => onRemove(item.id)} aria-label={`Remove ${item.title}`}><Trash2 size={15} /></button></div>)}</div> : <EmptyState icon={Bookmark} title="Nothing saved yet" copy="When a page earns a place in your field kit, save it with the bookmark in the toolbar." />}</div>;
+}
+
+function HistoryView({ entries, onOpen, onClear }: { entries: HistoryItem[]; onOpen: (entry: HistoryItem) => void; onClear: () => void }) {
+  return <div className="page library-page"><PageHeading eyebrow="LIBRARY / TRACE" title="History" description="A quiet record of where the field has taken you." actions={entries.length ? <button className="text-btn" onClick={onClear}>Clear history</button> : undefined} />{entries.length ? <div className="list-panel">{entries.map((entry) => <div className="list-row" key={entry.id}><div className="row-icon"><History size={16} /></div><button className="row-main" onClick={() => onOpen(entry)}><strong>{entry.title}</strong><span>{entry.url}</span></button><span className="row-meta">{entry.visited}</span></div>)}</div> : <EmptyState icon={History} title="No history" copy="Future local visits and deliberate handoffs will appear here." />}</div>;
+}
+
+function readDownloads(): DownloadItem[] {
+  const stored = readStorage<unknown[]>("lycon-downloads", []);
+  if (!Array.isArray(stored)) return [];
+  return stored.map((item, index) => {
+    if (typeof item === "string") return { id: `legacy-download-${index}`, name: item, type: "Local file", size: 0, added: "Earlier", content: "" };
+    if (!item || typeof item !== "object") return null;
+    const record = item as Partial<DownloadItem>;
+    return { id: record.id ?? `download-${index}`, name: record.name ?? "Untitled local file", type: record.type ?? "Local file", size: record.size ?? 0, added: record.added ?? "Earlier", content: record.content ?? "" };
+  }).filter((item): item is DownloadItem => Boolean(item));
+}
+
+function excerptAround(content: string, query: string) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  const matchIndex = normalized.toLowerCase().indexOf(query.toLowerCase());
+  if (matchIndex < 0) return normalized.slice(0, 120) || "Local document with extracted text";
+  const start = Math.max(0, matchIndex - 42);
+  const excerpt = normalized.slice(start, start + 150);
+  return `${start > 0 ? "…" : ""}${excerpt}${start + 150 < normalized.length ? "…" : ""}`;
+}
+
+function formatBytes(size: number) { if (size < 1024) return `${size} B`; if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`; return `${(size / (1024 * 1024)).toFixed(1)} MB`; }
+
+function DownloadsView({ downloads, onPick }: { downloads: DownloadItem[]; onPick: () => void }) {
+  return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file) => <div className="list-row" key={file.id}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file.name}</strong><span>{file.type} · {formatBytes(file.size)} · {file.content ? "Indexed locally" : "Metadata only"}</span></div><span className="row-meta">{file.added}</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
+}
+
+function OverflowMenu({ onNavigate, onSettings, onClearData }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void }) {
+  return <div className="overflow-menu" role="menu" aria-label="Browser menu"><div className="overflow-heading">MORE <span>Browser controls</span></div><button role="menuitem" onClick={() => onNavigate("bookmarks")}><Bookmark size={15} />Saved pages</button><button role="menuitem" onClick={() => onNavigate("history")}><History size={15} />History</button><button role="menuitem" onClick={() => onNavigate("downloads")}><Download size={15} />Downloads</button><div className="overflow-divider" /><button role="menuitem" onClick={() => onSettings("appearance")}><Settings size={15} />Settings</button><button role="menuitem" onClick={() => onSettings("privacy")}><ShieldCheck size={15} />Privacy &amp; security</button><button role="menuitem" onClick={() => onSettings("permissions")}><LockKeyhole size={15} />Site permissions</button><div className="overflow-divider" /><button role="menuitem" className="danger-item" onClick={onClearData}><Trash2 size={15} />Clear browsing data</button></div>;
+}
+
+function SettingsView({ settings, section, setSection, updateSetting }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void }) {
+  const settingNav: Array<{ id: SettingsSection; label: string; icon: LucideIcon }> = [{ id: "appearance", label: "Appearance", icon: Palette }, { id: "privacy", label: "Privacy", icon: ShieldCheck }, { id: "permissions", label: "Permissions", icon: LockKeyhole }, { id: "search", label: "Search", icon: Search }];
+  return <div className="page settings-page"><PageHeading eyebrow="CONTROL ROOM / SETTINGS" title="Settings" description="Keep the browser’s posture in your hands." /><div className="settings-layout"><div className="settings-nav">{settingNav.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</div><div className="settings-card">{section === "appearance" && <><SettingHeader title="Appearance" copy="Choose how the field looks when you return." /><SettingSelect label="Theme" value={settings.theme} options={[{ value: "dark", label: "Night watch" }, { value: "light", label: "Day field" }]} onChange={(value) => updateSetting("theme", value as Theme)} /><SettingSelect label="Startup view" value={settings.startupView} options={[{ value: "start", label: "Start page" }, { value: "last", label: "Last active view" }]} onChange={(value) => updateSetting("startupView", value as "start" | "last")} /></>}{section === "privacy" && <><SettingHeader title="Privacy" copy="Make the local boundary visible and easy to adjust." /><SettingToggle label="Shields" copy="Keep known trackers and noisy requests at a distance." checked={settings.shieldsEnabled} onChange={(checked) => updateSetting("shieldsEnabled", checked)} /><SettingToggle label="Private tabs" copy="Keep this session out of the standard local trace." checked={activeBoolean(false)} onChange={() => undefined} /></>}{section === "permissions" && <><SettingHeader title="Site permissions" copy="Keep microphone and location requests explicit." /><SettingSelect label="Microphone" value={settings.microphonePermission} options={[{ value: "ask", label: "Ask every time" }, { value: "allow", label: "Allow" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("microphonePermission", value as SettingsState["microphonePermission"])} /><SettingSelect label="Location" value={settings.locationPermission} options={[{ value: "ask", label: "Ask every time" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("locationPermission", value as SettingsState["locationPermission"])} /></>}{section === "search" && <><SettingHeader title="Search" copy="Lycon Search indexes this workspace directly. Ordinary queries never leave the app." /><div className="setting-note"><Search size={16} /><div><strong>Native Lycon Search</strong><p>Local pages, saved content, history, downloads, and settings stay in Lycon’s own index.</p></div></div></>}</div></div></div>;
+}
+
+function activeBoolean(value: boolean) { return value; }
+
+function SettingHeader({ title, copy }: { title: string; copy: string }) { return <div className="setting-header"><h2>{title}</h2><p>{copy}</p></div>; }
+function SettingSelect({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) { return <label className="setting-control"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>; }
+function SettingToggle({ label, copy, checked, onChange }: { label: string; copy: string; checked: boolean; onChange: (checked: boolean) => void }) { return <div className="setting-toggle"><div><strong>{label}</strong><p>{copy}</p></div><button className={`toggle ${checked ? "on" : ""}`} onClick={() => onChange(!checked)} role="switch" aria-checked={checked}><span /></button></div>; }
+
+function OnlineView({ page, onlineOpened, onOpen, onBack }: { page: PageRecord; onlineOpened: boolean; onOpen: () => void; onBack: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => { if (!onlineOpened) { setLoading(false); setBlocked(false); return; } setLoading(true); setBlocked(false); const timeout = window.setTimeout(() => { setLoading(false); setBlocked(true); }, 9000); return () => window.clearTimeout(timeout); }, [onlineOpened, page.url]);
+  return <div className={`page online-page ${onlineOpened ? "online-page-open" : ""}`}>{onlineOpened ? <div className="embedded-browser"><div className="embedded-label"><span className={`status-dot ${loading ? "status-pulse" : ""}`} /> {loading ? "Connecting inside Lycon" : blocked ? "Embedded page unavailable" : "Rendering inside Lycon"}</div>{loading ? <div className="load-progress" role="progressbar" aria-label="Loading embedded page"><span /></div> : null}{blocked ? <div className="embed-fallback"><WifiOff size={19} /><strong>This site did not allow an embedded view.</strong><p>Lycon kept the request inside this workspace and did not open another browser.</p><button className="secondary-btn" onClick={onBack}><HomeIcon size={14} /> Return to local</button></div> : <iframe title={`Lycon view of ${page.title}`} src={page.url} referrerPolicy="no-referrer" sandbox="allow-forms allow-modals allow-popups allow-presentation allow-scripts" onLoad={() => setLoading(false)} onError={() => { setLoading(false); setBlocked(true); }} />}</div> : <><div className="online-visual"><Globe2 size={26} /></div><div className="eyebrow">INTENTIONAL HANDOFF / ONLINE</div><h1>The wild starts here.</h1><p>This address belongs to the wider web. Lycon keeps it inside this workspace until you say go.</p><div className="online-status"><span className="status-dot" /> Online available</div><div className="handoff-card"><div className="handoff-url"><LockKeyhole size={14} /> {page.url}</div><div className="handoff-actions"><button className="primary-btn" onClick={onOpen}><ExternalLink size={15} /> Open inside Lycon</button><button className="secondary-btn" onClick={onBack}><HomeIcon size={14} /> Return to local</button></div><small className="handoff-note">Some sites may restrict embedded rendering. Lycon will never open an external browser window.</small></div></>}</div>;
+}
+
+function EmptyState({ icon: Icon, title, copy }: { icon: LucideIcon; title: string; copy: string }) { return <div className="empty-state"><div className="empty-icon"><Icon size={17} /></div><strong>{title}</strong><p>{copy}</p></div>; }
