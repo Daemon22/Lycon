@@ -228,3 +228,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add persisted South African English (en-ZA) voice-language selection.
 - [x] Pass en-ZA to the browser-native recognizer and fall back safely when unsupported.
 - [x] Validate the Voice settings surface and recognition language wiring, then save a checkpoint.
+
+## Voice Availability and South African English Pack
+
+- [x] Detect browser language-pack availability before starting recognition.
+- [x] Add a Voice settings test phrase control for microphone and language verification.
+- [x] Add a South African English offline Vosk catalog entry and selection workflow.
+- [x] Validate voice preflight, test phrase, catalog behavior, and responsive settings, then save a checkpoint.

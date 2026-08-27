@@ -25,3 +25,7 @@ Final verification passed: Settings exposes the Voice section with online, brows
 ## South African English voice validation
 
 The live Voice settings panel now presents English (South Africa) as the selected built-in language, with the standard `en-ZA` tag passed to the browser-native recognizer. Online, on-device, and Offline Vosk modes remain available. If the browser reports `language-not-supported`, recognition retries with the browser language and then reports a clear unavailable-language status rather than failing silently.
+
+## Voice preflight and catalog validation
+
+Live Settings verification passed: the Voice section shows the browser-native recognition mode selector, `English (South Africa)` (`en-ZA`) as the selected language, a visible “Run test” microphone/language control, and an offline catalog containing an honest South African English browser-profile entry plus the verified downloadable English small pack. The Run test control is intentionally user-triggered because it requests microphone access; the implementation performs `SpeechRecognition.available()` preflight when the browser exposes it.

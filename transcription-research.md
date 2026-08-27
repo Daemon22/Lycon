@@ -18,3 +18,8 @@ Whisper/WebAssembly offers stronger general vocabulary and multilingual robustne
 ## Official model sizing
 
 The official [Vosk Models](https://alphacephei.com/vosk/models) catalog states that small models are intended for mobile and desktop use, typically around 50 MB and around 300 MB runtime memory, while larger models trade substantial size for accuracy. The catalog lists `vosk-model-small-en-us-0.15` at about 40 MB, making it a reasonable opt-in English pack for Lycon, provided the user understands the separate download and memory trade-off.
+
+
+## South African English availability
+
+The official Vosk model catalog does not currently list a dedicated South African English (`en-ZA`) model. Lycon should therefore expose an honest catalog entry that distinguishes **South African English language profile** from **downloadable model availability**: use the browser-native `en-ZA` path where the browser provides it, and offer the official small English model only as a fallback offline pack until a verified en-ZA Vosk model is available. This avoids labeling an en-US model as South African English.
