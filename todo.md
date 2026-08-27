@@ -18,3 +18,13 @@ Desktop and mobile screenshots confirm the forest background resolves correctly,
 - [x] Remove the wolf artwork from the Start hero while keeping the sidebar brand mark.
 - [x] Rebalance the forest background and hero content after removing the artwork.
 - [x] Validate desktop and mobile composition and save a new publish-ready checkpoint.
+
+## Canonical Logo Replacement
+
+- [x] Replace the generated crest reference with the user-supplied LYCON logo asset.
+- [x] Update favicon and brand lockup references without changing the forest hero background.
+- [x] Validate logo quality at desktop and mobile sizes, then save a new publish-ready checkpoint.
+
+### Canonical logo validation note
+
+The supplied high-resolution LYCON logo now appears in the sidebar brand lockup and favicon reference. Desktop and mobile screenshots show the correct gold-and-purple mark at readable scale; the forest hero remains free of repeated wolf artwork.
