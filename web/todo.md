@@ -133,3 +133,10 @@ The expanded Search description remains readable on mobile, and the Downloads su
 - [ ] Run final type-check, production build, and targeted smoke checks.
 - [ ] Commit and push the latest full-text search changes.
 - [ ] Open the updated preview and verify the core search and browsing surfaces.
+
+## Full Tree Clean Run
+
+- [x] Inventory root, web, desktop, mobile, and integration test commands.
+- [x] Run every supported check and record failures or environment-only limitations.
+- [x] Fix actionable failures and re-run the complete validation set (no actionable code failures; remaining blockers are environment-only).
+- [x] Confirm the pushed tree and working tree are clean after committing this validation record.
