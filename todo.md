@@ -155,3 +155,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add a browser-level privacy notice explaining local indexing and microphone permissions.
 - [x] Keep clear browsing history available and add individual delete actions for saved pages.
 - [x] Validate filtering, privacy messaging, and granular data controls, then save a checkpoint.
+
+## Safe Data Controls and Advanced Search
+
+- [x] Add confirmation dialogs before clearing history/downloads and deleting individual saved pages.
+- [x] Add local JSON export and import for bookmarks and Lycon search data.
+- [x] Add date-range and content-type filters to native Search results.
+- [x] Validate destructive-action safeguards, backup round-trip behavior, and advanced filters, then save a checkpoint.
