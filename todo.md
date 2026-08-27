@@ -111,3 +111,18 @@ Searching “example” returns both the saved example.com page and a browsing-h
 ### Final richer-index validation note
 
 Desktop and mobile captures confirm result cards remain readable with category, timestamp, and URL metadata. The embedded handoff surface remains contained within Lycon’s viewport, with a dedicated in-app status label and responsive action card. No external browser window is used.
+
+## Full-Text Local Index
+
+- [x] Inspect the current download and local document data structures and storage flow.
+- [x] Extract searchable text and metadata from locally stored document/download records without sending data externally.
+- [x] Add document and download matches to Lycon Search with useful snippets and result types.
+- [x] Validate full-text queries, direct result navigation, and responsive result presentation, then save a checkpoint.
+
+### Full-text surface validation note
+
+Desktop Search and Downloads surfaces render correctly after the data-model upgrade. Downloads now have a dedicated Add file entry point, and Search remains a single-field local index surface ready to receive document text and metadata from locally stored files.
+
+### Full-text responsive validation note
+
+The expanded Search description remains readable on mobile, and the Downloads surface keeps its Add file action and empty state within the viewport without clipping. Document result cards will use the same compact metadata and snippet treatment when local files are indexed.

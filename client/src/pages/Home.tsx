@@ -60,6 +60,15 @@ type BookmarkItem = {
 
 type HistoryItem = PageRecord & { id: string; visited: string };
 
+type DownloadItem = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  added: string;
+  content: string;
+};
+
 type SettingsState = {
   theme: Theme;
   shieldsEnabled: boolean;
@@ -144,7 +153,7 @@ export default function Home() {
   const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
   const [bookmarks, setBookmarks] = usePersistedState<BookmarkItem[]>("lycon-bookmarks", []);
   const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory);
-  const [downloads, setDownloads] = usePersistedState<string[]>("lycon-downloads", []);
+  const [downloads, setDownloads] = usePersistedState<DownloadItem[]>("lycon-downloads", readDownloads());
   const [tabs, setTabs] = useState<Tab[]>([{ id: 1, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
   const [activeTabId, setActiveTabId] = useState(1);
   const [currentView, setCurrentView] = useState<View>(() => viewFromPath(window.location.pathname));
@@ -268,11 +277,18 @@ export default function Home() {
     }
   };
 
-  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setDownloads((previous) => [file.name, ...previous]);
-    showToast(`${file.name} added to downloads`);
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const textLike = file.type.startsWith("text/") || ["md", "markdown", "txt", "csv", "json", "html", "htm", "xml", "svg", "log"].includes(extension);
+    let content = "";
+    if (textLike && file.size <= 2_000_000) {
+      try { content = (await file.text()).slice(0, 120_000); } catch { content = ""; }
+    }
+    const item: DownloadItem = { id: `download-${Date.now()}`, name: file.name, type: file.type || extension.toUpperCase() || "Local file", size: file.size, added: "Just now", content };
+    setDownloads((previous) => [item, ...previous].slice(0, 100));
+    showToast(`${file.name} added to downloads${content ? " and indexed" : ""}`);
     event.target.value = "";
   };
 
@@ -320,7 +336,7 @@ export default function Home() {
 
         <div className="content-scroll">
           {currentView === "start" && <StartView />}
-          {currentView === "search" && <SearchView page={activePage} bookmarks={bookmarks} historyEntries={historyEntries} onOpen={(url) => navigateTo(createDestination(url))} />}
+          {currentView === "search" && <SearchView page={activePage} bookmarks={bookmarks} historyEntries={historyEntries} downloads={downloads} onOpen={(url) => navigateTo(createDestination(url))} />}
           {currentView === "bookmarks" && <BookmarksView bookmarks={bookmarks} onOpen={(item) => navigateTo(createDestination(item.url))} onRemove={(id) => { setBookmarks((previous) => previous.filter((item) => item.id !== id)); showToast("Bookmark removed"); }} />}
           {currentView === "history" && <HistoryView entries={historyEntries} onOpen={(entry) => navigateTo(createDestination(entry.url))} onClear={() => { setHistoryEntries([]); showToast("History cleared"); }} />}
           {currentView === "downloads" && <DownloadsView downloads={downloads} onPick={() => fileInput.current?.click()} />}
@@ -364,14 +380,15 @@ function PageHeading({ eyebrow, title, description, actions }: { eyebrow: string
   return <div className="content-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{actions ? <div className="heading-actions">{actions}</div> : null}</div>;
 }
 
-function SearchView({ page, bookmarks, historyEntries, onOpen }: { page: PageRecord; bookmarks: BookmarkItem[]; historyEntries: HistoryItem[]; onOpen: (url: string) => void }) {
+function SearchView({ page, bookmarks, historyEntries, downloads, onOpen }: { page: PageRecord; bookmarks: BookmarkItem[]; historyEntries: HistoryItem[]; downloads: DownloadItem[]; onOpen: (url: string) => void }) {
   const query = page.query ?? page.title.replace(/^Search: /, "");
   const coreIndex = [{ title: "Start", url: "lycon://start", copy: "The local-first Lycon home surface.", category: "CORE", meta: "Local surface" }, { title: "Saved pages", url: "lycon://bookmarks", copy: "Your locally saved pages and deliberate handoffs.", category: "CORE", meta: "Library" }, { title: "History", url: "lycon://history", copy: "A quiet trace of local visits and handoffs.", category: "CORE", meta: `${historyEntries.length} records` }, { title: "Downloads", url: "lycon://downloads", copy: "Files held in your local field kit.", category: "CORE", meta: "Library" }, { title: "Settings", url: "lycon://settings", copy: "Appearance, privacy, permissions, and search controls.", category: "CORE", meta: "Control room" }];
   const savedIndex = bookmarks.map((item) => ({ title: item.title, url: item.url, copy: item.kind === "online" ? "Saved online handoff" : "Saved local page", category: "SAVED", meta: "Saved page" }));
   const historyIndex = historyEntries.map((item) => ({ title: item.title, url: item.url, copy: item.kind === "online" ? "Visited online handoff" : "Visited local surface", category: "HISTORY", meta: item.visited }));
-  const matches = [...coreIndex, ...savedIndex, ...historyIndex].filter((item, index, items) => `${item.title} ${item.copy} ${item.url}`.toLowerCase().includes(query.toLowerCase()) && items.findIndex((candidate) => candidate.url === item.url && candidate.title === item.title) === index);
+  const downloadIndex = downloads.map((item) => ({ title: item.name, url: "lycon://downloads", copy: item.content ? excerptAround(item.content, query) : `${item.type} download · metadata indexed locally`, category: "DOCUMENT", meta: `${formatBytes(item.size)} · ${item.added}` }));
+  const matches = [...coreIndex, ...savedIndex, ...historyIndex, ...downloadIndex].filter((item, index, items) => `${item.title} ${item.copy} ${item.url}`.toLowerCase().includes(query.toLowerCase()) && items.findIndex((candidate) => candidate.url === item.url && candidate.title === item.title) === index);
   const results = matches.length ? matches : [{ title: `No local match for “${query}”`, url: "lycon://start", copy: "Lycon Search only indexes this workspace. Try a page name, saved page, or browser function.", category: "NO MATCH", meta: "Local index" }];
-  return <div className="page library-page search-page"><PageHeading eyebrow="LYCON SEARCH / LOCAL INDEX" title={`Results for “${query}”`} description="Lycon Search indexes this workspace, including saved pages and browsing history. Ordinary searches never leave the app." /><div className="search-results">{results.map((result, index) => <button className="search-result" key={result.url + result.title} onClick={() => onOpen(result.url)}><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-body"><strong>{result.title}</strong><span>{result.copy}</span><small>{result.category} · {result.meta} · {result.url}</small></span><ChevronRight size={16} /></button>)}</div></div>;
+  return <div className="page library-page search-page"><PageHeading eyebrow="LYCON SEARCH / LOCAL INDEX" title={`Results for “${query}”`} description="Lycon Search indexes this workspace, including saved pages, browsing history, downloads, and extracted document text. Ordinary searches never leave the app." /><div className="search-results">{results.map((result, index) => <button className="search-result" key={result.url + result.title} onClick={() => onOpen(result.url)}><span className="result-index">{String(index + 1).padStart(2, "0")}</span><span className="result-body"><strong>{result.title}</strong><span>{result.copy}</span><small>{result.category} · {result.meta} · {result.url}</small></span><ChevronRight size={16} /></button>)}</div></div>;
 }
 
 function BookmarksView({ bookmarks, onOpen, onRemove }: { bookmarks: BookmarkItem[]; onOpen: (item: BookmarkItem) => void; onRemove: (id: string) => void }) {
@@ -382,8 +399,30 @@ function HistoryView({ entries, onOpen, onClear }: { entries: HistoryItem[]; onO
   return <div className="page library-page"><PageHeading eyebrow="LIBRARY / TRACE" title="History" description="A quiet record of where the field has taken you." actions={entries.length ? <button className="text-btn" onClick={onClear}>Clear history</button> : undefined} />{entries.length ? <div className="list-panel">{entries.map((entry) => <div className="list-row" key={entry.id}><div className="row-icon"><History size={16} /></div><button className="row-main" onClick={() => onOpen(entry)}><strong>{entry.title}</strong><span>{entry.url}</span></button><span className="row-meta">{entry.visited}</span></div>)}</div> : <EmptyState icon={History} title="No history" copy="Future local visits and deliberate handoffs will appear here." />}</div>;
 }
 
-function DownloadsView({ downloads, onPick }: { downloads: string[]; onPick: () => void }) {
-  return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file, index) => <div className="list-row" key={`${file}-${index}`}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file}</strong><span>Local file · ready to open</span></div><span className="row-meta">LOCAL</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
+function readDownloads(): DownloadItem[] {
+  const stored = readStorage<unknown[]>("lycon-downloads", []);
+  if (!Array.isArray(stored)) return [];
+  return stored.map((item, index) => {
+    if (typeof item === "string") return { id: `legacy-download-${index}`, name: item, type: "Local file", size: 0, added: "Earlier", content: "" };
+    if (!item || typeof item !== "object") return null;
+    const record = item as Partial<DownloadItem>;
+    return { id: record.id ?? `download-${index}`, name: record.name ?? "Untitled local file", type: record.type ?? "Local file", size: record.size ?? 0, added: record.added ?? "Earlier", content: record.content ?? "" };
+  }).filter((item): item is DownloadItem => Boolean(item));
+}
+
+function excerptAround(content: string, query: string) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  const matchIndex = normalized.toLowerCase().indexOf(query.toLowerCase());
+  if (matchIndex < 0) return normalized.slice(0, 120) || "Local document with extracted text";
+  const start = Math.max(0, matchIndex - 42);
+  const excerpt = normalized.slice(start, start + 150);
+  return `${start > 0 ? "…" : ""}${excerpt}${start + 150 < normalized.length ? "…" : ""}`;
+}
+
+function formatBytes(size: number) { if (size < 1024) return `${size} B`; if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`; return `${(size / (1024 * 1024)).toFixed(1)} MB`; }
+
+function DownloadsView({ downloads, onPick }: { downloads: DownloadItem[]; onPick: () => void }) {
+  return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file) => <div className="list-row" key={file.id}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file.name}</strong><span>{file.type} · {formatBytes(file.size)} · {file.content ? "Indexed locally" : "Metadata only"}</span></div><span className="row-meta">{file.added}</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
 }
 
 function OverflowMenu({ onNavigate, onSettings, onClearData }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void }) {
