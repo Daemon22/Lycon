@@ -134,6 +134,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .muted-ink { color: hsl(var(--muted-foreground)); }
 
 .content-scroll { min-height: 0; flex: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background) / .96), hsl(266 22% 10% / .82)), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-blend-mode: normal, soft-light; }
+.content-split-open { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 0; }
+.primary-content { min-width: 0; min-height: 100%; }
+.split-pane { min-width: 0; padding: 24px 17px; border-left: 1px solid hsl(var(--border) / .72); background: hsl(var(--card) / .35); }
+.split-pane-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; color: hsl(var(--primary)); font: 9px var(--font-mono); letter-spacing: .15em; }
+.split-pane > strong { display: block; max-width: 150px; margin-bottom: 8px; color: hsl(var(--foreground)); font: 600 18px/1.1 var(--font-display); letter-spacing: -.04em; }
+.split-pane > p { margin: 0 0 22px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.55; }
+.split-pane-actions { display: grid; gap: 7px; }
+.split-pane-actions .secondary-btn { justify-content: flex-start; }
 .page { min-height: 100%; padding: clamp(31px, 7vw, 72px) clamp(22px, 6vw, 78px); animation: page-in .25s cubic-bezier(.23,1,.32,1) both; }
 .page:not(.start-page) { position: relative; }
 .page:not(.start-page)::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 82% 0%, hsl(var(--primary) / .08), transparent 34%); }
@@ -194,6 +202,18 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .content-heading p { max-width: 510px; margin: 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.65; }
 .heading-actions { flex: none; }
 .text-btn { color: hsl(var(--primary)); background: transparent; font: 11px var(--font-mono); }
+.history-summary { display: flex; flex-wrap: wrap; gap: 9px; margin: 5px 0 12px; color: hsl(var(--muted-foreground)); font: 10px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
+.history-summary span { padding: 6px 8px; border: 1px solid hsl(var(--border) / .7); border-radius: 5px; background: hsl(var(--card) / .45); }
+.history-summary strong { color: hsl(var(--primary)); font-weight: 600; }
+.history-search { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 0 10px; min-height: 36px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--card) / .55); color: hsl(var(--muted-foreground)); }
+.history-search input { width: 100%; border: 0; outline: 0; background: transparent; color: hsl(var(--foreground)); font: 12px var(--font-body); }
+.history-search button { display: inline-grid; place-items: center; color: hsl(var(--muted-foreground)); background: transparent; }
+.history-groups { display: grid; gap: 20px; }
+.history-group { display: grid; gap: 8px; }
+.history-group-heading { display: flex; justify-content: space-between; align-items: baseline; color: hsl(var(--primary)); font: 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.history-group-heading small { color: hsl(var(--muted-foreground)); font: 10px var(--font-body); letter-spacing: 0; text-transform: none; }
+.online-history-icon { color: hsl(var(--accent)); }
+
 .list-panel { max-width: 950px; margin: 0 auto; border: 1px solid hsl(var(--border) / .7); border-radius: 10px; overflow: hidden; background: hsl(var(--card) / .45); }
 .list-row { min-height: 64px; display: flex; align-items: center; gap: 12px; padding: 10px 15px; border-bottom: 1px solid hsl(var(--border) / .52); }
 .list-row:last-child { border-bottom: 0; }
@@ -267,6 +287,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes mic-pulse { 0%, 100% { transform: scale(.92); } 50% { transform: scale(1.12); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+@media print { .lycon-sidebar, .window-bar, .toolbar, .privacy-notice, .toast, .overflow-menu { display: none !important; } .lycon-main { margin: 0; } }
+
 @media (max-width: 800px) {
   .sidebar-collapsed .lycon-sidebar { width: 66px; flex-basis: 66px; }
   .lycon-sidebar { width: 66px; flex-basis: 66px; padding: 18px 8px 12px; }
@@ -292,6 +314,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .hero h1 { font-size: 45px; }
   .overflow-menu { right: -7px; width: min(318px, calc(100vw - 18px)); }
   .search-filters { margin-top: -4px; }
+  .content-split-open { grid-template-columns: minmax(0, 1fr) 176px; }
+  .split-pane { padding: 19px 11px; }
+  .split-pane-heading { margin-bottom: 26px; }
   .search-subfilters { margin-top: -2px; }
   .search-result { grid-template-columns: 28px minmax(0, 1fr) auto; padding: 13px 11px; }
   .privacy-notice { left: 12px; right: 12px; bottom: 12px; }

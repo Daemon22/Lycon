@@ -13,3 +13,11 @@ The live menu opens and exposes all expected entries. Two coordinate-based attem
 ## Sidebar visibility validation
 
 The DOM-level interaction successfully toggled the sidebar into its collapsed state. The menu stayed in place and changed the action label from “Hide sidebar” to “Show sidebar”, while the main content expanded into the freed horizontal space. This confirms the sidebar shift is reversible and does not require a redesign of the existing shell.
+
+## History and screenshot validation
+
+The dedicated History route renders persisted local records with visit counts, local-versus-online summary, a filter field, Today/Yesterday/Earlier grouping, and direct reopen buttons. The application menu now labels itself with “Esc to close”, and the DOM-level Screenshot action triggered successfully from History, closed the menu, and returned to the page without a visible runtime error. The browser harness did not expose a download confirmation, so the implementation uses a standard local PNG anchor download from the captured canvas.
+
+## Expanded menu surfaces
+
+The live Settings route now exposes Appearance, Privacy, Permissions, Search, Tabs, Extensions, Passwords, Translate, More tools, and Help. The Tabs surface renders a local tab/window status panel, confirming Tab groups no longer falls into a dead-end toast. History continues to render as its own locally retrieved interface.

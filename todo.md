@@ -169,3 +169,18 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add professional overflow-menu actions for tabs, zoom, favorites, history, downloads, extensions placeholder, passwords placeholder, print, translate, split view, screenshot, find-on-page, settings, help, and close-tab behavior where supported.
 - [x] Preserve local-only data handling and clearly label unavailable native capabilities without opening external windows.
 - [x] Refine the browser chrome and validate desktop/mobile menu behavior, then save a checkpoint.
+
+## Dedicated History, Accessible Menu, and Local Screenshots
+
+- [x] Build out the History view with locally persisted retrieval, date grouping, and direct reopen actions.
+- [x] Add focus trapping, initial focus, roving Tab behavior, and Escape close handling to the overflow menu.
+- [x] Implement real local screenshot capture from the menu with a downloadable PNG snapshot.
+- [x] Validate History persistence, keyboard accessibility, screenshot download behavior, and responsive layout, then save a checkpoint.
+
+## Expanded Reference Menu Scope
+
+- [x] Audit every function shown in the supplied browser application-menu screenshots.
+- [x] Replace placeholder menu rows with working local-first equivalents wherever Lycon can support them.
+- [x] Add working surfaces for tab/window actions, tab groups, extensions/passwords entry points, translate, split view, screenshot, find-on-page, settings, help, and close-tab behavior.
+- [x] Document only the functions intentionally excluded because they require native browser privileges or a backend service.
+- [x] Validate the expanded menu against the reference on desktop and mobile, then save a checkpoint.
