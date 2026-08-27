@@ -6,8 +6,8 @@ import {
   ArrowRight,
   Bookmark,
   Check,
-  ChevronRight,
   CircleDot,
+  ChevronRight,
   Download,
   ExternalLink,
   FilePlus2,
@@ -24,7 +24,6 @@ import {
   KeyRound,
   Camera,
   HelpCircle,
-  PanelRight,
   MoreHorizontal,
   AppWindow,
   Layers3,
@@ -109,10 +108,6 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday", visitedAt: Date.now() - 1000 * 60 * 60 * 26 },
 ];
 
-const navItems: Array<{ view: View; label: string; icon: LucideIcon }> = [
-  { view: "start", label: "Start", icon: HomeIcon },
-];
-
 const defaultSettings: SettingsState = {
   theme: "dark",
   shieldsEnabled: true,
@@ -192,13 +187,14 @@ export default function Home() {
   const [privacyNoticeOpen, setPrivacyNoticeOpen] = usePersistedState("lycon-privacy-notice", true);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [screenshotBusy, setScreenshotBusy] = useState(false);
   const [splitViewOpen, setSplitViewOpen] = useState(false);
+  const [draggingTabId, setDraggingTabId] = useState<number | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const backupInput = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
   const overflowButtonRef = useRef<HTMLButtonElement>(null);
+  const overflowShellRef = useRef<HTMLDivElement>(null);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const shellState = activeTab?.isPrivate ? "private" : activePage.kind === "online" ? "online" : "local";
@@ -368,6 +364,16 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (!overflowOpen) return;
+    const handleOutsidePointer = (event: PointerEvent) => { if (!overflowShellRef.current?.contains(event.target as Node)) setOverflowOpen(false); };
+    document.addEventListener("pointerdown", handleOutsidePointer);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointer);
+  }, [overflowOpen]);
+
+  const moveTab = (tabId: number, targetIndex: number) => setTabs((previous) => { const currentIndex = previous.findIndex((tab) => tab.id === tabId); if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previous.length || currentIndex === targetIndex) return previous; const next = [...previous]; const [moved] = next.splice(currentIndex, 1); next.splice(targetIndex, 0, moved); return next; });
+  const reorderTab = (tabId: number, targetId: number) => { const targetIndex = tabs.findIndex((tab) => tab.id === targetId); moveTab(tabId, targetIndex); setDraggingTabId(null); };
+
+  useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
@@ -391,26 +397,15 @@ export default function Home() {
   const importLocalData = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; try { const parsed = JSON.parse(await file.text()) as Partial<BackupPayload>; if (parsed.format !== "lycon-local-backup" || parsed.version !== 1) throw new Error("Unsupported backup"); const importedBookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks.filter(isBookmarkItem) : []; const importedHistory = Array.isArray(parsed.history) ? parsed.history.filter(isHistoryItem) : []; const importedDownloads = Array.isArray(parsed.downloads) ? parsed.downloads.filter(isDownloadItem) : []; setBookmarks((previous) => mergeById(previous, importedBookmarks)); setHistoryEntries((previous) => mergeById(previous, importedHistory).slice(0, 50)); setDownloads((previous) => mergeById(previous, importedDownloads).slice(0, 100)); showToast(`Imported ${importedBookmarks.length} saved pages and ${importedDownloads.length} documents`); } catch { showToast("That file is not a Lycon local backup"); } };
 
   return (
-    <div className={`lycon-app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
-      <aside className="lycon-sidebar">
-        <div className="brand-lockup">
-          <img className="brand-mark" src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="Lycon wolf mark" />
-          <div className="brand-copy"><strong>LYCON</strong><span>LOCAL BY DEFAULT</span></div>
-        </div>
-        <div className="side-label">LIBRARY</div>
-        <nav className="side-nav" aria-label="Primary browser navigation">
-          {navItems.map(({ view, label, icon: Icon }) => <button key={view} className={`nav-item ${currentView === view ? "active" : ""}`} onClick={() => navigateView(view)} aria-current={currentView === view ? "page" : undefined}><Icon size={15} /><span>{label}</span></button>)}
-        </nav>
-        <div className="sidebar-footnote"><span className="status-line"><CircleDot size={9} /> Local mode</span><p>Your library lives here. Online pages wait for your deliberate handoff.</p></div>
-      </aside>
-
+    <div className="lycon-app" style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
       <main className="lycon-main">
         <div className="tab-strip">
+          <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="" /></button>
           <div className="tabs">
-            {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+            {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
-          <div className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} sidebarCollapsed={sidebarCollapsed} /> : null}</div>
+          <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
         </div>
         <div className="toolbar">
           <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
@@ -546,7 +541,7 @@ function DownloadsView({ downloads, onPick }: { downloads: DownloadItem[]; onPic
   return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file) => <div className="list-row" key={file.id}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file.name}</strong><span>{file.type} · {formatBytes(file.size)} · {file.content ? "Indexed locally" : "Metadata only"}</span></div><span className="row-meta">{file.added}</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
 }
 
-function OverflowMenu({ onNavigate, onSettings, onClearData, onNewTab, onNewWindow, onNewPrivateTab, onCloseTab, onClose, onScreenshot, screenshotBusy, onToggleSplitView, splitViewOpen, zoomLevel, onZoomIn, onZoomOut, onZoomReset, onPrint, onFind, onUnsupported, onToggleSidebar, sidebarCollapsed }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void; onNewTab: () => void; onNewWindow: () => void; onNewPrivateTab: () => void; onCloseTab: () => void; onClose: () => void; onScreenshot: () => void; screenshotBusy: boolean; onToggleSplitView: () => void; splitViewOpen: boolean; zoomLevel: number; onZoomIn: () => void; onZoomOut: () => void; onZoomReset: () => void; onPrint: () => void; onFind: () => void; onUnsupported: (label: string) => void; onToggleSidebar: () => void; sidebarCollapsed: boolean }) {
+function OverflowMenu({ onNavigate, onSettings, onClearData, onNewTab, onNewWindow, onNewPrivateTab, onCloseTab, onClose, onScreenshot, screenshotBusy, onToggleSplitView, splitViewOpen, zoomLevel, onZoomIn, onZoomOut, onZoomReset, onPrint, onFind, onUnsupported }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void; onNewTab: () => void; onNewWindow: () => void; onNewPrivateTab: () => void; onCloseTab: () => void; onClose: () => void; onScreenshot: () => void; screenshotBusy: boolean; onToggleSplitView: () => void; splitViewOpen: boolean; zoomLevel: number; onZoomIn: () => void; onZoomOut: () => void; onZoomReset: () => void; onPrint: () => void; onFind: () => void; onUnsupported: (label: string) => void }) {
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const menu = menuRef.current;
@@ -565,7 +560,7 @@ function OverflowMenu({ onNavigate, onSettings, onClearData, onNewTab, onNewWind
     return () => document.removeEventListener("keydown", handleMenuKeyDown);
   }, [onClose]);
   const item = (label: string, icon: ReactNode, onClick: () => void, shortcut?: string, className = "") => <button role="menuitem" className={className} onClick={onClick}><span className="menu-icon">{icon}</span><span>{label}</span>{shortcut ? <small>{shortcut}</small> : null}</button>;
-  return <div ref={menuRef} className="overflow-menu" role="menu" aria-label="Browser application menu"><div className="overflow-heading">LYCON MENU <span>Browser controls · Esc to close</span></div>{item("New tab", <Plus size={15} />, onNewTab, "Ctrl+T")}{item("New window", <AppWindow size={15} />, onNewWindow, "Ctrl+N")}{item("New private tab", <EyeOff size={15} />, onNewPrivateTab, "Ctrl+Shift+N")}<div className="menu-zoom-row"><button onClick={onZoomOut} aria-label="Zoom out"><Minus size={14} /></button><button onClick={onZoomReset}>{zoomLevel}%</button><button onClick={onZoomIn} aria-label="Zoom in"><Plus size={14} /></button></div><div className="overflow-divider" />{item("Favorites", <Bookmark size={15} />, () => onNavigate("bookmarks"), "Ctrl+Shift+O")}{item("History", <History size={15} />, () => onNavigate("history"), "Ctrl+H")}{item("Downloads", <Download size={15} />, () => onNavigate("downloads"), "Ctrl+J")}{item("Tab groups", <Layers3 size={15} />, () => onSettings("tabs"), "›")}{item("Extensions", <Puzzle size={15} />, () => onSettings("extensions"), "›")}{item("Passwords", <KeyRound size={15} />, () => onSettings("passwords"), "›")}<div className="overflow-divider" />{item("Delete browsing data", <Trash2 size={15} />, onClearData, "Ctrl+Shift+Delete", "danger-item")}{item("Print", <Printer size={15} />, onPrint, "Ctrl+P")}{item("Translate", <Languages size={15} />, () => onSettings("translate"))}{item(sidebarCollapsed ? "Show sidebar" : "Hide sidebar", <PanelRight size={15} />, onToggleSidebar)}{item(splitViewOpen ? "Close split screen" : "Split screen", <Layers3 size={15} />, onToggleSplitView)}{item(screenshotBusy ? "Capturing snapshot…" : "Screenshot", <Camera size={15} />, onScreenshot, "Ctrl+Shift+S")}{item("Find on page", <Search size={15} />, onFind, "Ctrl+F")}{item("More tools", <MoreHorizontal size={15} />, () => onSettings("tools"), "›")}<div className="overflow-divider" />{item("Settings", <Settings size={15} />, () => onSettings("appearance"))}{item("Help and feedback", <HelpCircle size={15} />, () => onSettings("help"), "›")}{item("Close tab", <X size={15} />, onCloseTab)}</div>;
+  return <div ref={menuRef} className="overflow-menu" role="menu" aria-label="Browser application menu"><div className="overflow-heading">LYCON MENU <span>Browser controls · Esc to close</span></div>{item("New tab", <Plus size={15} />, onNewTab, "Ctrl+T")}{item("New window", <AppWindow size={15} />, onNewWindow, "Ctrl+N")}{item("New private tab", <EyeOff size={15} />, onNewPrivateTab, "Ctrl+Shift+N")}<div className="menu-zoom-row"><button onClick={onZoomOut} aria-label="Zoom out"><Minus size={14} /></button><button onClick={onZoomReset}>{zoomLevel}%</button><button onClick={onZoomIn} aria-label="Zoom in"><Plus size={14} /></button></div><div className="overflow-divider" />{item("Favorites", <Bookmark size={15} />, () => onNavigate("bookmarks"), "Ctrl+Shift+O")}{item("History", <History size={15} />, () => onNavigate("history"), "Ctrl+H")}{item("Downloads", <Download size={15} />, () => onNavigate("downloads"), "Ctrl+J")}{item("Tab groups", <Layers3 size={15} />, () => onSettings("tabs"), "›")}{item("Extensions", <Puzzle size={15} />, () => onSettings("extensions"), "›")}{item("Passwords", <KeyRound size={15} />, () => onSettings("passwords"), "›")}<div className="overflow-divider" />{item("Delete browsing data", <Trash2 size={15} />, onClearData, "Ctrl+Shift+Delete", "danger-item")}{item("Print", <Printer size={15} />, onPrint, "Ctrl+P")}{item("Translate", <Languages size={15} />, () => onSettings("translate"))}{item(splitViewOpen ? "Close split screen" : "Split screen", <Layers3 size={15} />, onToggleSplitView)}{item(screenshotBusy ? "Capturing snapshot…" : "Screenshot", <Camera size={15} />, onScreenshot, "Ctrl+Shift+S")}{item("Find on page", <Search size={15} />, onFind, "Ctrl+F")}{item("More tools", <MoreHorizontal size={15} />, () => onSettings("tools"), "›")}<div className="overflow-divider" />{item("Settings", <Settings size={15} />, () => onSettings("appearance"))}{item("Help and feedback", <HelpCircle size={15} />, () => onSettings("help"), "›")}{item("Close tab", <X size={15} />, onCloseTab)}</div>;
 }
 
 function SettingsView({ settings, section, setSection, updateSetting, tabs, onExport, onImport }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void; tabs: Tab[]; onExport: () => void; onImport: () => void }) {

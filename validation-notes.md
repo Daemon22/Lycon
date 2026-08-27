@@ -1,27 +1,11 @@
-## Browser application menu validation
+## Sidebar-free shell geometry diagnosis
 
-The live Lycon preview exposes an expanded three-dot browser application menu labeled “LYCON MENU / Browser controls”. The menu includes New tab, New private tab, zoom controls, Favorites, History, Downloads, Extensions, Passwords, Delete browsing data, Print, Translate, Hide/Show sidebar, Screenshot, Find on page, More tools, Settings, Help and feedback, and Close tab. Menu actions remain in-app; unsupported capabilities show a local availability notice rather than opening an external window. Browser console inspection returned no runtime errors after opening the menu.
+After removing the sidebar, the live shell correctly fills the viewport, but the new `.home-mark` button had no explicit flex sizing. Its computed width expanded to roughly 1186px, leaving only a 5px tab area and causing the tablet preview to look broken. The fix is to give the logo Home control an explicit fixed flex-basis and width, while allowing the real tabs to own the remaining strip space.
 
-## Refreshed menu verification
+## Sidebar-free shell verification
 
-After the shell update, the live preview exposes New tab, New window, New private tab, zoom, Favorites, History, Downloads, Tab groups, Extensions, Passwords, Delete browsing data, Print, Translate, Hide sidebar, Screenshot, Find on page, More tools, Settings, Help and feedback, and Close tab. The menu remains anchored to the upper-right browser chrome and is contained with scrolling space for smaller viewports.
+The live shell now has no persistent sidebar. The canonical LYCON mark is the fixed 52px Home control at the start of the tab strip; the Starter tab is visible at 150px; the tabs region owns the remaining width; New tab and overflow controls stay right-aligned. This corrected the earlier tablet geometry issue where the unstyled Home button expanded across the strip.
 
-## Interaction-test note
+## Click-outside and Home control interaction test
 
-The live menu opens and exposes all expected entries. Two coordinate-based attempts to select the sidebar visibility row did not persist in the browser harness, so the control is being checked through the page DOM rather than treating the harness click result as a product failure.
-
-## Sidebar visibility validation
-
-The DOM-level interaction successfully toggled the sidebar into its collapsed state. The menu stayed in place and changed the action label from “Hide sidebar” to “Show sidebar”, while the main content expanded into the freed horizontal space. This confirms the sidebar shift is reversible and does not require a redesign of the existing shell.
-
-## History and screenshot validation
-
-The dedicated History route renders persisted local records with visit counts, local-versus-online summary, a filter field, Today/Yesterday/Earlier grouping, and direct reopen buttons. The application menu now labels itself with “Esc to close”, and the DOM-level Screenshot action triggered successfully from History, closed the menu, and returned to the page without a visible runtime error. The browser harness did not expose a download confirmation, so the implementation uses a standard local PNG anchor download from the captured canvas.
-
-## Expanded menu surfaces
-
-The live Settings route now exposes Appearance, Privacy, Permissions, Search, Tabs, Extensions, Passwords, Translate, More tools, and Help. The Tabs surface renders a local tab/window status panel, confirming Tab groups no longer falls into a dead-end toast. History continues to render as its own locally retrieved interface.
-
-## Shell layering and responsive visual validation
-
-The refreshed desktop preview shows the three-dot overflow menu positioned above the welcome page with a contained panel, visible menu rows, and no background bleed-through. The Starter tab now has a distinct rounded active surface, amber inset indicator, dedicated close affordance, and a separated new-tab control. Desktop History and Settings remain visually coherent with the updated browser chrome.
+The overflow menu opened from the top-right three-dot control and closed when the welcome surface was clicked outside it. The sidebar-free shell remained intact, with Home represented by the canonical logo at the left edge of the tab strip and the Starter tab remaining visible.

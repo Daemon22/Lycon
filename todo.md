@@ -191,3 +191,11 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Refine the Starter tab geometry, active state, close affordance, and new-tab control.
 - [x] Harden desktop, tablet, and mobile toolbar, menu, sidebar, and content behavior.
 - [x] Validate the updated shell visually at representative device widths, then save a checkpoint.
+
+## Simplified Living Browser Shell
+
+- [x] Remove the persistent sidebar and replace its Home role with the canonical LYCON mark in the top browser chrome.
+- [x] Audit every visible icon and connect it to a real local action or explicit in-app state.
+- [x] Add click-outside dismissal for the overflow menu and drag-to-reorder behavior for tabs.
+- [x] Optimize tablet layouts and retain fluid desktop/mobile behavior with restrained micro-interactions.
+- [x] Verify local search, History, bookmarks, downloads, settings, and online handoff after shell simplification, then save a checkpoint.
