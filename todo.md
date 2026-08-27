@@ -4,7 +4,7 @@
 - [x] Generate a portrait forest hero background with warm amber light and a dark lower vignette.
 - [x] Integrate the background into the Start view without weakening text contrast or hiding the browser shell.
 - [x] Validate the reference-inspired composition on desktop and mobile, including the voice search field.
-- [ ] Save a new publish-ready checkpoint after final validation.
+- [x] Save a new publish-ready checkpoint after final validation.
 
 ### Validation note
 
@@ -36,7 +36,7 @@ The supplied high-resolution LYCON logo now appears in the sidebar brand lockup 
 - [x] Unify viewport-aware sizing across shell, toolbar, tabs, menus, content pages, and responsive rail behavior.
 - [x] Improve chrome/content separation and restrained contrast without redesigning the existing Start page.
 - [x] Validate tabs, navigation, address/search, voice input, bookmarking, overflow access, privacy controls, and narrow-to-desktop viewports.
-- [ ] Save a revised publish-ready checkpoint.
+- [x] Save a revised publish-ready checkpoint.
 
 ### Overflow architecture validation note
 
