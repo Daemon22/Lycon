@@ -162,3 +162,10 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add local JSON export and import for bookmarks and Lycon search data.
 - [x] Add date-range and content-type filters to native Search results.
 - [x] Validate destructive-action safeguards, backup round-trip behavior, and advanced filters, then save a checkpoint.
+
+## Professional Browser Application Menu
+
+- [x] Map core browser menu functions to Lycon’s local-first and deliberate-online model.
+- [x] Add professional overflow-menu actions for tabs, zoom, favorites, history, downloads, extensions placeholder, passwords placeholder, print, translate, split view, screenshot, find-on-page, settings, help, and close-tab behavior where supported.
+- [x] Preserve local-only data handling and clearly label unavailable native capabilities without opening external windows.
+- [x] Refine the browser chrome and validate desktop/mobile menu behavior, then save a checkpoint.

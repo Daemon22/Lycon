@@ -1,5 +1,5 @@
 // Design system: Quiet Field Instrument — the sidebar owns state and library information; the hero stays focused on browsing, voice input, and deliberate handoff.
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,7 +16,17 @@ import {
   Home as HomeIcon,
   LockKeyhole,
   Mic,
+  Minus,
+  Printer,
+  Languages,
+  Puzzle,
+  KeyRound,
+  Camera,
+  HelpCircle,
+  PanelRight,
   MoreHorizontal,
+  AppWindow,
+  Layers3,
   Palette,
   Plus,
   RotateCw,
@@ -180,8 +190,11 @@ export default function Home() {
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [privacyNoticeOpen, setPrivacyNoticeOpen] = usePersistedState("lycon-privacy-notice", true);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const backupInput = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const shellState = activeTab?.isPrivate ? "private" : activePage.kind === "online" ? "online" : "local";
@@ -262,6 +275,17 @@ export default function Home() {
     setAddress(addressForPage(destination));
   };
 
+  const newPrivateTab = () => {
+    const id = Date.now();
+    setTabs((previous) => [...previous, { id, title: "Private", isPrivate: true, history: [{ title: "Private", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
+    setActiveTabId(id);
+    setCurrentView("start");
+    window.history.pushState({}, "", "/");
+    setActivePage({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
+    setAddress("");
+    showToast("Private tab opened");
+  };
+
   const newTab = () => {
     const id = Date.now();
     setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
@@ -273,7 +297,7 @@ export default function Home() {
   };
 
   const closeTab = (id: number) => {
-    if (tabs.length === 1) return;
+    if (tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
     const remaining = tabs.filter((tab) => tab.id !== id);
     setTabs(remaining);
     if (id === activeTabId) setActiveTabId(remaining[remaining.length - 1].id);
@@ -313,13 +337,37 @@ export default function Home() {
   const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => setSettings((previous) => ({ ...previous, [key]: value }));
   const openSettingsSection = (section: SettingsSection) => { setSettingsSection(section); navigateTo({ title: "Settings", url: "lycon://settings", kind: "local", view: "settings" }); };
   const clearBrowsingData = () => { setHistoryEntries([]); setDownloads([]); showToast("History and downloads cleared"); setOverflowOpen(false); };
+  const changeZoom = (delta: number) => setZoomLevel((value) => Math.min(150, Math.max(70, value + delta)));
+  const resetZoom = () => setZoomLevel(100);
+  const printCurrentPage = () => { window.print(); setOverflowOpen(false); };
+  const findOnPage = () => { setOverflowOpen(false); addressInputRef.current?.focus(); addressInputRef.current?.select(); showToast("Type a term in the toolbar to search the local page index"); };
+  const showUnsupported = (label: string) => { setOverflowOpen(false); showToast(`${label} is not available in this local web shell yet`); };
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === "t") { event.preventDefault(); newTab(); }
+      else if (key === "n" && event.shiftKey) { event.preventDefault(); newPrivateTab(); }
+      else if (key === "w") { event.preventDefault(); closeTab(activeTabId); }
+      else if (key === "l") { event.preventDefault(); addressInputRef.current?.focus(); addressInputRef.current?.select(); }
+      else if (key === "f") { event.preventDefault(); findOnPage(); }
+      else if (key === "p") { event.preventDefault(); printCurrentPage(); }
+      else if (key === "h") { event.preventDefault(); navigateView("history"); }
+      else if (key === "j") { event.preventDefault(); navigateView("downloads"); }
+      else if (key === "o" && event.shiftKey) { event.preventDefault(); navigateView("bookmarks"); }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [activeTabId, tabs.length]);
+
   const requestClearBrowsingData = () => setConfirmAction({ title: "Clear browsing data?", copy: "This removes local history and downloaded document records from Lycon. Saved pages and settings stay untouched.", confirmLabel: "Clear local data", onConfirm: clearBrowsingData });
   const requestRemoveBookmark = (id: string) => { const item = bookmarks.find((bookmark) => bookmark.id === id); if (!item) return; setConfirmAction({ title: "Delete saved page?", copy: `Remove “${item.title}” from your local saved pages? This cannot be undone from Lycon.`, confirmLabel: "Delete saved page", onConfirm: () => { setBookmarks((previous) => previous.filter((bookmark) => bookmark.id !== id)); showToast("Saved page deleted"); } }); };
   const exportLocalData = () => { const payload: BackupPayload = { format: "lycon-local-backup", version: 1, exportedAt: new Date().toISOString(), bookmarks, history: historyEntries, downloads }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `lycon-local-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url); showToast("Local backup exported"); };
   const importLocalData = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; try { const parsed = JSON.parse(await file.text()) as Partial<BackupPayload>; if (parsed.format !== "lycon-local-backup" || parsed.version !== 1) throw new Error("Unsupported backup"); const importedBookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks.filter(isBookmarkItem) : []; const importedHistory = Array.isArray(parsed.history) ? parsed.history.filter(isHistoryItem) : []; const importedDownloads = Array.isArray(parsed.downloads) ? parsed.downloads.filter(isDownloadItem) : []; setBookmarks((previous) => mergeById(previous, importedBookmarks)); setHistoryEntries((previous) => mergeById(previous, importedHistory).slice(0, 50)); setDownloads((previous) => mergeById(previous, importedDownloads).slice(0, 100)); showToast(`Imported ${importedBookmarks.length} saved pages and ${importedDownloads.length} documents`); } catch { showToast("That file is not a Lycon local backup"); } };
 
   return (
-    <div className="lycon-app">
+    <div className={`lycon-app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`} style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
       <aside className="lycon-sidebar">
         <div className="brand-lockup">
           <img className="brand-mark" src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="Lycon wolf mark" />
@@ -338,7 +386,7 @@ export default function Home() {
             {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
-          <div className="window-actions"><button className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} /> : null}</div>
+          <div className="window-actions"><button className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} sidebarCollapsed={sidebarCollapsed} /> : null}</div>
         </div>
         <div className="toolbar">
           <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
@@ -346,7 +394,7 @@ export default function Home() {
           <button className="icon-btn" onClick={() => showToast("Local page refreshed")} aria-label="Reload local page"><RotateCw size={16} /></button>
           <form className="address-wrap" onSubmit={submitAddress}>
             {activeTab?.isPrivate ? <EyeOff size={15} className="private-ink" /> : <LockKeyhole size={14} className={activePage.kind === "local" ? "local-ink" : "online-ink"} />}
-            <input className="address-input" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search locally or enter an address" aria-label="Address and search" />
+            <input ref={addressInputRef} className="address-input" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search locally or enter an address" aria-label="Address and search" />
             {address ? <button type="button" className="clear-btn" onClick={() => setAddress("")} aria-label="Clear address"><X size={13} /></button> : <Search size={14} className="muted-ink" />}
             <VoiceInputButton onTranscript={setAddress} onStatus={showToast} />
           </form>
@@ -463,8 +511,9 @@ function DownloadsView({ downloads, onPick }: { downloads: DownloadItem[]; onPic
   return <div className="page library-page"><PageHeading eyebrow="LIBRARY / INTAKE" title="Downloads" description="Files you have pulled into your local field kit." actions={<button className="primary-btn" onClick={onPick}><FilePlus2 size={15} /> Add file</button>} />{downloads.length ? <div className="list-panel">{downloads.map((file) => <div className="list-row" key={file.id}><div className="row-icon"><FolderDown size={16} /></div><div className="row-main"><strong>{file.name}</strong><span>{file.type} · {formatBytes(file.size)} · {file.content ? "Indexed locally" : "Metadata only"}</span></div><span className="row-meta">{file.added}</span></div>)}</div> : <EmptyState icon={Download} title="No downloads" copy="Files you choose to keep close will be listed in your local library." />}</div>;
 }
 
-function OverflowMenu({ onNavigate, onSettings, onClearData }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void }) {
-  return <div className="overflow-menu" role="menu" aria-label="Browser menu"><div className="overflow-heading">MORE <span>Browser controls</span></div><button role="menuitem" onClick={() => onNavigate("bookmarks")}><Bookmark size={15} />Saved pages</button><button role="menuitem" onClick={() => onNavigate("history")}><History size={15} />History</button><button role="menuitem" onClick={() => onNavigate("downloads")}><Download size={15} />Downloads</button><div className="overflow-divider" /><button role="menuitem" onClick={() => onSettings("appearance")}><Settings size={15} />Settings</button><button role="menuitem" onClick={() => onSettings("privacy")}><ShieldCheck size={15} />Privacy &amp; security</button><button role="menuitem" onClick={() => onSettings("permissions")}><LockKeyhole size={15} />Site permissions</button><div className="overflow-divider" /><button role="menuitem" className="danger-item" onClick={onClearData}><Trash2 size={15} />Clear browsing data</button></div>;
+function OverflowMenu({ onNavigate, onSettings, onClearData, onNewTab, onNewPrivateTab, onCloseTab, zoomLevel, onZoomIn, onZoomOut, onZoomReset, onPrint, onFind, onUnsupported, onToggleSidebar, sidebarCollapsed }: { onNavigate: (view: View) => void; onSettings: (section: SettingsSection) => void; onClearData: () => void; onNewTab: () => void; onNewPrivateTab: () => void; onCloseTab: () => void; zoomLevel: number; onZoomIn: () => void; onZoomOut: () => void; onZoomReset: () => void; onPrint: () => void; onFind: () => void; onUnsupported: (label: string) => void; onToggleSidebar: () => void; sidebarCollapsed: boolean }) {
+  const item = (label: string, icon: ReactNode, onClick: () => void, shortcut?: string, className = "") => <button role="menuitem" className={className} onClick={onClick}><span className="menu-icon">{icon}</span><span>{label}</span>{shortcut ? <small>{shortcut}</small> : null}</button>;
+  return <div className="overflow-menu" role="menu" aria-label="Browser application menu"><div className="overflow-heading">LYCON MENU <span>Browser controls</span></div>{item("New tab", <Plus size={15} />, onNewTab, "Ctrl+T")}{item("New window", <AppWindow size={15} />, () => onUnsupported("New window"), "Ctrl+N")}{item("New private tab", <EyeOff size={15} />, onNewPrivateTab, "Ctrl+Shift+N")}<div className="menu-zoom-row"><button onClick={onZoomOut} aria-label="Zoom out"><Minus size={14} /></button><button onClick={onZoomReset}>{zoomLevel}%</button><button onClick={onZoomIn} aria-label="Zoom in"><Plus size={14} /></button></div><div className="overflow-divider" />{item("Favorites", <Bookmark size={15} />, () => onNavigate("bookmarks"), "Ctrl+Shift+O")}{item("History", <History size={15} />, () => onNavigate("history"), "Ctrl+H")}{item("Downloads", <Download size={15} />, () => onNavigate("downloads"), "Ctrl+J")}{item("Tab groups", <Layers3 size={15} />, () => onUnsupported("Tab groups"), "›")}{item("Extensions", <Puzzle size={15} />, () => onUnsupported("Extensions"), "›")}{item("Passwords", <KeyRound size={15} />, () => onUnsupported("Passwords"), "›")}<div className="overflow-divider" />{item("Delete browsing data", <Trash2 size={15} />, onClearData, "Ctrl+Shift+Delete", "danger-item")}{item("Print", <Printer size={15} />, onPrint, "Ctrl+P")}{item("Translate", <Languages size={15} />, () => onUnsupported("Translate"))}{item(sidebarCollapsed ? "Show sidebar" : "Hide sidebar", <PanelRight size={15} />, onToggleSidebar)}{item("Screenshot", <Camera size={15} />, () => onUnsupported("Screenshot"), "Ctrl+Shift+S")}{item("Find on page", <Search size={15} />, onFind, "Ctrl+F")}{item("More tools", <MoreHorizontal size={15} />, () => onUnsupported("More tools"), "›")}<div className="overflow-divider" />{item("Settings", <Settings size={15} />, () => onSettings("appearance"))}{item("Help and feedback", <HelpCircle size={15} />, () => onUnsupported("Help and feedback"), "›")}{item("Close tab", <X size={15} />, onCloseTab)}</div>;
 }
 
 function SettingsView({ settings, section, setSection, updateSetting, onExport, onImport }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void; onExport: () => void; onImport: () => void }) {
