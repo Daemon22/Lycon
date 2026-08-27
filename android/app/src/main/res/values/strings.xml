@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lycon</string>
+    <string name="app_tagline">Browse wild. Browse free.</string>
+
+    <!-- Navigation -->
+    <string name="action_new_tab">New Tab</string>
+    <string name="action_new_private_tab">New Private Tab</string>
+    <string name="action_close_tab">Close Tab</string>
+    <string name="action_bookmarks">Bookmarks</string>
+    <string name="action_history">History</string>
+    <string name="action_downloads">Downloads</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_shields">Lycon Shields</string>
+
+    <!-- URL bar -->
+    <string name="urlbar_hint">Search or type a URL</string>
+    <string name="shields_blocked_format">%1$d blocked</string>
+
+    <!-- Settings -->
+    <string name="settings_theme">Theme</string>
+    <string name="settings_accent">Accent color</string>
+    <string name="settings_search_engine">Default search engine</string>
+    <string name="settings_shields">Lycon Shields (ad blocker)</string>
+    <string name="settings_https_only">HTTPS-Only Mode</string>
+    <string name="settings_private_default">Private tabs by default</string>
+
+    <!-- Errors -->
+    <string name="error_load_failed">Failed to load page</string>
+    <string name="error_no_internet">No internet connection</string>
+</resources>

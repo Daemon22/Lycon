@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="LyconWindows.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:LyconWindows"
+    xmlns:wv2="using:Microsoft.Web.WebView2.WinUI"
+    Title="Lycon"
+    Width="1280"
+    Height="820"
+    MinWidth="720"
+    MinHeight="480">
+    <Grid>
+        <wv2:WebView2
+            x:Name="BrowserWebView"
+            Source="about:blank"
+            NavigationStarting="BrowserWebView_NavigationStarting"
+            NavigationCompleted="BrowserWebView_NavigationCompleted"
+            WebMessageReceived="BrowserWebView_WebMessageReceived"/>
+    </Grid>
+</Window>
