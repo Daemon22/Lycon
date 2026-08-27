@@ -65,3 +65,26 @@ Clear browsing data is reachable from the overflow menu, clears the local histor
 ### Final synchronization note
 
 Desktop and narrow mobile captures confirm the shell and content remain separated, the Start, Settings, and History pages share the same responsive rules, the simplified rail does not create horizontal overflow, and the forest Start surface stays readable without competing secondary navigation.
+
+## Lycon Search Surface
+
+- [x] Remove the duplicate hero search input and keep only the browser address/search field.
+- [x] Add an in-app Lycon Search results view for ordinary queries.
+- [x] Render direct web destinations inside Lycon’s content viewport instead of opening an external browser.
+- [x] Validate search, tabs, responsive layout, voice input, and in-app handoff behavior, then save a checkpoint.
+
+### Single-search validation note
+
+The Start page now contains no second search input. The toolbar address/search field is the only search surface; submitting “privacy” routes to `/search`, displays Lycon Search results from the internal workspace index, and keeps the shell state LOCAL without contacting an external search engine.
+
+### Internal search and browsing validation note
+
+Lycon now has exactly one search input in the toolbar. Ordinary queries route to the local `/search` index, while direct web addresses route to Lycon’s `/online` handoff surface. Choosing Open inside Lycon renders the destination inside an iframe within the content viewport and does not open a new external browser window; external sites may render blank when they disallow embedding.
+
+### Native search validation note
+
+The Start surface exposes only the toolbar address/search input. Route terms such as “settings” resolve to Lycon’s local Settings page, while ordinary terms such as “privacy” resolve to the internal Lycon Search page with local indexed results and no external search-engine URL.
+
+### Final native-browser validation note
+
+Desktop and mobile captures show one visible address/search field at a time: the browser toolbar field. The Start, native Search, and Settings pages fit within their content viewport with no horizontal overflow. The browser shell keeps tabs, navigation, voice input, bookmark, shields, private mode, and overflow controls visible and synchronized.

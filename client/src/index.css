@@ -142,6 +142,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .hero-note { max-width: 540px; margin-top: 14px; display: flex; justify-content: space-between; color: hsl(var(--muted-foreground) / .72); font: 10px var(--font-mono); letter-spacing: .03em; }
 .hero-note span { display: inline-flex; align-items: center; gap: 6px; }
 .hero-note span:first-child { color: hsl(140 53% 62%); }
+.search-results { max-width: 950px; margin: 0 auto; display: grid; gap: 7px; }
+.search-result { width: 100%; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 15px 16px; border: 1px solid hsl(var(--border)); border-radius: 9px; color: hsl(var(--foreground)); background: hsl(var(--card) / .48); text-align: left; transition: border-color .18s ease, background .18s ease, transform .18s ease; }
+.search-result:hover { border-color: hsl(var(--primary) / .45); background: hsl(var(--primary) / .06); transform: translateX(3px); }
+.result-index { color: hsl(var(--primary)); font: 11px var(--font-mono); }
+.result-body { min-width: 0; display: grid; gap: 5px; }
+.result-body strong { font-size: 13px; }
+.result-body span, .result-body small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--muted-foreground)); font-size: 11px; }
+.result-body small { color: hsl(var(--primary) / .75); font: 10px var(--font-mono); }
+.online-page-open { padding: 18px; }
+.embedded-browser { min-height: 100%; display: flex; flex-direction: column; gap: 9px; }
+.embedded-label { flex: none; display: flex; align-items: center; gap: 7px; color: hsl(140 53% 62%); font: 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.embedded-browser iframe { width: 100%; min-height: min(72vh, 760px); flex: 1; border: 1px solid hsl(var(--border)); border-radius: 9px; background: white; }
+.handoff-note { display: block; margin-top: 11px; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.55; }
 
 .content-heading { max-width: 950px; margin: 0 auto 29px; display: flex; align-items: end; justify-content: space-between; gap: 25px; padding-bottom: 22px; border-bottom: 1px solid hsl(var(--border) / .62); }
 .content-heading h1 { margin: 10px 0 8px; font: 600 clamp(30px, 4vw, 48px)/1 var(--font-display); letter-spacing: -.055em; }
@@ -170,6 +183,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .setting-header { padding-bottom: 19px; border-bottom: 1px solid hsl(var(--border) / .65); }
 .setting-header h2 { margin: 0 0 7px; font: 600 20px var(--font-display); letter-spacing: -.03em; }
 .setting-header p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
+.setting-note { display: flex; align-items: flex-start; gap: 11px; padding: 14px; border: 1px solid hsl(var(--primary) / .22); border-radius: 8px; color: hsl(var(--primary)); background: hsl(var(--primary) / .06); }
+.setting-note strong { display: block; color: hsl(var(--foreground)); font-size: 12px; }
+.setting-note p { margin: 5px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.55; }
 .setting-control { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 60px; border-bottom: 1px solid hsl(var(--border) / .55); color: hsl(var(--foreground)); font-size: 12px; }
 .setting-control select { min-width: 145px; padding: 8px 10px; color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--input)); font: 11px var(--font-mono); }
 .setting-toggle { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 0; border-bottom: 1px solid hsl(var(--border) / .55); }
@@ -216,9 +232,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .voice-btn { width: 28px; height: 28px; }
   .page { padding: 31px 18px; }
   .hero h1 { font-size: 45px; }
-  .hero-search { height: auto; min-height: 47px; flex-wrap: wrap; padding: 8px 10px; }
-  .hero-search .address-input { width: calc(100% - 39px); flex: 1 1 calc(100% - 39px); }
   .overflow-menu { right: -7px; }
+  .search-result { grid-template-columns: 28px minmax(0, 1fr) auto; padding: 13px 11px; }
+  .online-page-open { padding: 15px; }
+
   .hero-search .primary-btn { margin-left: auto; }
   .hero-note { flex-wrap: wrap; gap: 7px; }
   .content-heading { align-items: start; flex-direction: column; }
