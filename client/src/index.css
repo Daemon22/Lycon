@@ -97,6 +97,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .tab:hover { color: hsl(var(--foreground)); background: hsl(var(--secondary) / .5); }
 .tab.active { color: hsl(var(--foreground)); background: hsl(var(--background) / .94); border-color: hsl(var(--border) / .72); box-shadow: 0 -2px 0 hsl(var(--primary) / .66) inset; }
 .tab-signal { width: 7px; height: 7px; flex: none; border-radius: 50%; background: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary) / .1); }
+.tab-favicon { width: 16px; height: 16px; flex: none; border-radius: 4px; object-fit: contain; background: hsl(var(--secondary) / .62); }
+.tab.long-pressing { color: hsl(var(--primary)); box-shadow: 0 -2px 0 hsl(var(--accent) / .9) inset, 0 0 0 2px hsl(var(--primary) / .1); }
+.tab.long-pressing .tab-favicon { transform: scale(1.1); }
 .tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-close { margin-left: auto; display: inline-grid; place-items: center; color: hsl(var(--muted-foreground)); }
 .new-tab, .window-actions { display: grid; place-items: center; position: relative; z-index: 90; }
@@ -295,6 +298,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
 @media print { .lycon-sidebar, .window-bar, .toolbar, .privacy-notice, .toast, .overflow-menu { display: none !important; } .lycon-main { margin: 0; } }
 
+@media (min-width: 801px) and (max-width: 1100px) {
+  .tablet-compact-toolbar { min-height: 48px; gap: 4px; padding: 6px 9px; }
+  .tablet-compact-toolbar > .icon-btn { width: 28px; height: 28px; }
+  .tablet-compact-toolbar .address-wrap { height: 34px; gap: 7px; padding-inline: 8px; }
+  .tablet-compact-toolbar .voice-btn { width: 28px; height: 28px; }
+  .tablet-compact-toolbar .console-signal { padding-inline: 7px; font-size: 8px; }
+}
+
 @media (max-width: 800px) {
   .sidebar-collapsed .lycon-sidebar { width: 66px; flex-basis: 66px; }
   .lycon-sidebar { width: 66px; flex-basis: 66px; padding: 18px 8px 12px; }
@@ -313,6 +324,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 }
 @media (max-width: 520px) {
   .tab { min-width: 118px; height: 34px; padding-inline: 9px; }
+  .tab-favicon { width: 15px; height: 15px; }
   .tab-strip { height: 42px; }
   .home-mark { width: 42px; flex-basis: 42px; height: 34px; }
   .home-mark img { width: 25px; height: 25px; }

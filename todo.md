@@ -207,3 +207,11 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add touch-friendly tab reordering for tablet and mobile pointers with accessible keyboard fallback.
 - [x] Create a compact overflow menu layout for narrow screens without losing menu actions.
 - [x] Validate reload persistence and responsive local functionality, then save a checkpoint.
+
+## Adaptive Voice and Tab Metadata
+
+- [x] Add a tablet-specific compact toolbar mode while retaining accessible labels and core actions.
+- [x] Add long-press visual feedback and best-effort haptic feedback for touch tab reordering.
+- [x] Add dynamic tab titles and favicons derived from local pages, files, and online destinations.
+- [x] Evaluate a lightweight offline/online transcription path and preserve browser-native fallback behavior.
+- [x] Validate adaptive shell behavior, voice fallback, and tab metadata, then save a checkpoint.

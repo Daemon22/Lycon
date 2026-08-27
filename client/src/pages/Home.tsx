@@ -50,6 +50,7 @@ type SettingsSection = "appearance" | "privacy" | "search" | "permissions" | "ta
 type Tab = {
   id: number;
   title: string;
+  favicon?: string;
   isPrivate: boolean;
   history: PageRecord[];
   historyIndex: number;
@@ -61,6 +62,7 @@ type PageRecord = {
   kind: PageKind;
   view?: View;
   query?: string;
+  favicon?: string;
 };
 
 type BookmarkItem = {
@@ -108,7 +110,7 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday", visitedAt: Date.now() - 1000 * 60 * 60 * 26 },
 ];
 
-const initialTabs: Tab[] = [{ id: 1, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }];
+const initialTabs: Tab[] = [  { id: 1, title: "Start", isPrivate: false, favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png", history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" }], historyIndex: 0 }];
 
 const defaultSettings: SettingsState = {
   theme: "dark",
@@ -164,12 +166,13 @@ function createDestination(value: string): PageRecord {
     "lycon://settings": "settings",
   };
   const normalized = trimmed.toLowerCase().replace(/^\//, "");
-  if (localRoutes[normalized]) return { title: normalized, url: `lycon://${normalized}`, kind: "local", view: localRoutes[normalized] };
+  if (localRoutes[normalized]) return { title: normalized, url: `lycon://${normalized}`, kind: "local", view: localRoutes[normalized], favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
   if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
     const url = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed;
-    return { title: url.replace(/^https?:\/\//, "").split("/")[0], url, kind: "online" };
+    const domain = url.replace(/^https?:\/\//, "").split("/")[0];
+    return { title: domain, url, kind: "online", favicon: `https://${domain}/favicon.ico` };
   }
-  return { title: `Search: ${trimmed}`, url: `lycon://search?q=${encodeURIComponent(trimmed)}`, kind: "search", view: "search", query: trimmed };
+  return { title: `Search: ${trimmed}`, url: `lycon://search?q=${encodeURIComponent(trimmed)}`, kind: "search", view: "search", query: trimmed, favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
 }
 
 export default function Home() {
@@ -191,7 +194,10 @@ export default function Home() {
   const [screenshotBusy, setScreenshotBusy] = useState(false);
   const [splitViewOpen, setSplitViewOpen] = useState(false);
   const [draggingTabId, setDraggingTabId] = useState<number | null>(null);
-  const tabPointerRef = useRef<{ id: number; moved: boolean } | null>(null);
+  const [pressingTabId, setPressingTabId] = useState<number | null>(null);
+  const tabPointerRef = useRef<{ id: number; moved: boolean; touch: boolean } | null>(null);
+  const tabLongPressRef = useRef<number | null>(null);
+  const suppressTabClickRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const backupInput = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -255,7 +261,7 @@ export default function Home() {
     setAddress(addressForPage(destination));
     setOnlineOpened(false);
     const nextHistory = [...(activeTab?.history ?? []), destination];
-    updateTab({ title: destination.title, history: nextHistory, historyIndex: nextHistory.length - 1 });
+    updateTab({ title: destination.title, favicon: destination.favicon, history: nextHistory, historyIndex: nextHistory.length - 1 });
     const nextHistoryEntry: HistoryItem = { ...destination, id: `history-${Date.now()}`, visited: "Just now", visitedAt: Date.now() };
     setHistoryEntries((previous) => [nextHistoryEntry, ...previous.filter((item) => item.url !== destination.url)].slice(0, 50));
   };
@@ -274,7 +280,7 @@ export default function Home() {
     if (!activeTab || activeTab.historyIndex <= 0) return;
     const nextIndex = activeTab.historyIndex - 1;
     const destination = activeTab.history[nextIndex];
-    updateTab({ historyIndex: nextIndex, title: destination.title });
+    updateTab({ historyIndex: nextIndex, title: destination.title, favicon: destination.favicon });
     setCurrentView(destination.view ?? "online");
     window.history.replaceState({}, "", routePath(destination.view ?? "online"));
     setActivePage(destination);
@@ -285,7 +291,7 @@ export default function Home() {
     if (!activeTab || activeTab.historyIndex >= activeTab.history.length - 1) return;
     const nextIndex = activeTab.historyIndex + 1;
     const destination = activeTab.history[nextIndex];
-    updateTab({ historyIndex: nextIndex, title: destination.title });
+    updateTab({ historyIndex: nextIndex, title: destination.title, favicon: destination.favicon });
     setCurrentView(destination.view ?? "online");
     window.history.replaceState({}, "", routePath(destination.view ?? "online"));
     setActivePage(destination);
@@ -294,7 +300,8 @@ export default function Home() {
 
   const newPrivateTab = () => {
     const id = Date.now();
-    setTabs((previous) => [...previous, { id, title: "Private", isPrivate: true, history: [{ title: "Private", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
+    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+    setTabs((previous) => [...previous, { id, title: "Private", isPrivate: true, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
     setActiveTabId(id);
     setCurrentView("start");
     window.history.pushState({}, "", "/");
@@ -305,7 +312,8 @@ export default function Home() {
 
   const newTab = () => {
     const id = Date.now();
-    setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
+    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+    setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
     setActiveTabId(id);
     setCurrentView("start");
     window.history.pushState({}, "", "/");
@@ -389,9 +397,9 @@ export default function Home() {
 
   const moveTab = (tabId: number, targetIndex: number) => setTabs((previous) => { const currentIndex = previous.findIndex((tab) => tab.id === tabId); if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previous.length || currentIndex === targetIndex) return previous; const next = [...previous]; const [moved] = next.splice(currentIndex, 1); next.splice(targetIndex, 0, moved); return next; });
   const reorderTab = (tabId: number, targetId: number) => { const targetIndex = tabs.findIndex((tab) => tab.id === targetId); moveTab(tabId, targetIndex); setDraggingTabId(null); };
-  const handleTabPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: number) => { if (event.button !== 0) return; tabPointerRef.current = { id: tabId, moved: false }; event.currentTarget.setPointerCapture?.(event.pointerId); };
-  const handleTabPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => { const pointer = tabPointerRef.current; if (!pointer) return; if (Math.abs(event.movementX) + Math.abs(event.movementY) > 3) pointer.moved = true; if (!pointer.moved) return; setDraggingTabId(pointer.id); const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tab-id]"); const targetId = element ? Number(element.dataset.tabId) : null; if (targetId && targetId !== pointer.id) reorderTab(pointer.id, targetId); };
-  const handleTabPointerUp = () => { tabPointerRef.current = null; setDraggingTabId(null); };
+  const handleTabPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: number) => { if (event.button !== 0) return; const touch = event.pointerType !== "mouse"; tabPointerRef.current = { id: tabId, moved: false, touch }; if (touch) { setPressingTabId(tabId); tabLongPressRef.current = window.setTimeout(() => { setDraggingTabId(tabId); if ("vibrate" in navigator) navigator.vibrate?.(18); }, 420); } event.currentTarget.setPointerCapture?.(event.pointerId); };
+  const handleTabPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => { const pointer = tabPointerRef.current; if (!pointer) return; if (Math.abs(event.movementX) + Math.abs(event.movementY) > 3) { pointer.moved = true; if (pointer.touch && draggingTabId === pointer.id) suppressTabClickRef.current = true; } if (pointer.touch && draggingTabId !== pointer.id) return; if (!pointer.moved) return; setPressingTabId(null); setDraggingTabId(pointer.id); const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tab-id]"); const targetId = element ? Number(element.dataset.tabId) : null; if (targetId && targetId !== pointer.id) reorderTab(pointer.id, targetId); };
+  const handleTabPointerUp = () => { if (tabLongPressRef.current) window.clearTimeout(tabLongPressRef.current); tabLongPressRef.current = null; tabPointerRef.current = null; setPressingTabId(null); setDraggingTabId(null); };
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -422,12 +430,12 @@ export default function Home() {
         <div className="tab-strip">
           <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="" /></button>
           <div className="tabs">
-            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={(event) => { if (tabPointerRef.current?.moved) { tabPointerRef.current = null; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""} ${pressingTabId === tab.id ? "long-pressing" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { if (suppressTabClickRef.current) { suppressTabClickRef.current = false; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <img className="tab-favicon" src={tab.favicon ?? tab.history[tab.historyIndex]?.favicon ?? (tab.history[tab.historyIndex]?.kind === "online" ? `https://${new URL(tab.history[tab.historyIndex]?.url ?? "https://example.com").hostname}/favicon.ico` : "/manus-storage/lycon-canonical-logo_647e2a05.png")} alt="" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
           <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
         </div>
-        <div className="toolbar">
+        <div className="toolbar tablet-compact-toolbar">
           <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
           <button className="icon-btn" onClick={navigateForward} disabled={!activeTab || activeTab.historyIndex >= activeTab.history.length - 1} aria-label="Forward"><ArrowRight size={17} /></button>
           <button className="icon-btn" onClick={() => showToast("Local page refreshed")} aria-label="Reload local page"><RotateCw size={16} /></button>
