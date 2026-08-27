@@ -88,3 +88,26 @@ The Start surface exposes only the toolbar address/search input. Route terms suc
 ### Final native-browser validation note
 
 Desktop and mobile captures show one visible address/search field at a time: the browser toolbar field. The Start, native Search, and Settings pages fit within their content viewport with no horizontal overflow. The browser shell keeps tabs, navigation, voice input, bookmark, shields, private mode, and overflow controls visible and synchronized.
+
+## Search Index and Embedded Loading
+
+- [x] Index saved pages and browsing history with clear result types, timestamps, and direct navigation.
+- [x] Add an animated loading/progress state while embedded external pages open.
+- [x] Add a graceful embedded-page error or restriction state.
+- [x] Validate search relevance, loading behavior, and responsive presentation, then save a checkpoint.
+
+### Rich local index validation note
+
+Searching “example” now returns live history records with result type, relative visit time, and destination URL. The results remain inside `/search`, preserve the query in the single toolbar field, and keep the shell in LOCAL mode.
+
+### Saved-page indexing validation note
+
+A direct handoff can be saved from the toolbar bookmark control, which changes to Remove bookmark and shows “Saved to bookmarks.” The saved destination is now available for the richer local index alongside history records.
+
+### Final feature validation note
+
+Searching “example” returns both the saved example.com page and a browsing-history record with category, metadata, and destination URL. Direct example.com handoff renders successfully inside Lycon’s embedded viewport with the “Rendering inside Lycon” state visible; no external browser window is opened.
+
+### Final richer-index validation note
+
+Desktop and mobile captures confirm result cards remain readable with category, timestamp, and URL metadata. The embedded handoff surface remains contained within Lycon’s viewport, with a dedicated in-app status label and responsive action card. No external browser window is used.
