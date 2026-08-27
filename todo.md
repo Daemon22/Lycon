@@ -199,3 +199,11 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add click-outside dismissal for the overflow menu and drag-to-reorder behavior for tabs.
 - [x] Optimize tablet layouts and retain fluid desktop/mobile behavior with restrained micro-interactions.
 - [x] Verify local search, History, bookmarks, downloads, settings, and online handoff after shell simplification, then save a checkpoint.
+
+## Flexible Persistent Shell
+
+- [x] Remove the redundant visible “Your field stays local” permission notice while keeping permission controls in Settings.
+- [x] Persist open tabs, tab order, active tab, and active page state across reloads.
+- [x] Add touch-friendly tab reordering for tablet and mobile pointers with accessible keyboard fallback.
+- [x] Create a compact overflow menu layout for narrow screens without losing menu actions.
+- [x] Validate reload persistence and responsive local functionality, then save a checkpoint.

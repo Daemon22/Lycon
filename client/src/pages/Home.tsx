@@ -108,6 +108,8 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday", visitedAt: Date.now() - 1000 * 60 * 60 * 26 },
 ];
 
+const initialTabs: Tab[] = [{ id: 1, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }];
+
 const defaultSettings: SettingsState = {
   theme: "dark",
   shieldsEnabled: true,
@@ -175,8 +177,8 @@ export default function Home() {
   const [bookmarks, setBookmarks] = usePersistedState<BookmarkItem[]>("lycon-bookmarks", []);
   const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory);
   const [downloads, setDownloads] = usePersistedState<DownloadItem[]>("lycon-downloads", readDownloads());
-  const [tabs, setTabs] = useState<Tab[]>([{ id: 1, title: "Start", isPrivate: false, history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start" }], historyIndex: 0 }]);
-  const [activeTabId, setActiveTabId] = useState(1);
+  const [tabs, setTabs] = usePersistedState<Tab[]>("lycon-tabs", initialTabs);
+  const [activeTabId, setActiveTabId] = usePersistedState<number>("lycon-active-tab", 1);
   const [currentView, setCurrentView] = useState<View>(() => viewFromPath(window.location.pathname));
   const [activePage, setActivePage] = useState<PageRecord>({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
   const [address, setAddress] = useState("");
@@ -184,12 +186,12 @@ export default function Home() {
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("appearance");
   const [toast, setToast] = useState("");
   const [overflowOpen, setOverflowOpen] = useState(false);
-  const [privacyNoticeOpen, setPrivacyNoticeOpen] = usePersistedState("lycon-privacy-notice", true);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [screenshotBusy, setScreenshotBusy] = useState(false);
   const [splitViewOpen, setSplitViewOpen] = useState(false);
   const [draggingTabId, setDraggingTabId] = useState<number | null>(null);
+  const tabPointerRef = useRef<{ id: number; moved: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const backupInput = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -203,6 +205,21 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("lycon-active-tab", JSON.stringify(activeTabId)); } catch { /* storage can be unavailable */ }
+  }, [activeTabId]);
+
+  useEffect(() => {
+    const restoredTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+    if (!restoredTab) return;
+    const restoredPage = restoredTab.history[restoredTab.historyIndex] ?? restoredTab.history[0];
+    if (!restoredPage) return;
+    setCurrentView(restoredPage.view ?? "online");
+    setActivePage(restoredPage);
+    setAddress(addressForPage(restoredPage));
+    window.history.replaceState({}, "", routePath(restoredPage.view ?? "online"));
+  }, []);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -372,6 +389,9 @@ export default function Home() {
 
   const moveTab = (tabId: number, targetIndex: number) => setTabs((previous) => { const currentIndex = previous.findIndex((tab) => tab.id === tabId); if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previous.length || currentIndex === targetIndex) return previous; const next = [...previous]; const [moved] = next.splice(currentIndex, 1); next.splice(targetIndex, 0, moved); return next; });
   const reorderTab = (tabId: number, targetId: number) => { const targetIndex = tabs.findIndex((tab) => tab.id === targetId); moveTab(tabId, targetIndex); setDraggingTabId(null); };
+  const handleTabPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: number) => { if (event.button !== 0) return; tabPointerRef.current = { id: tabId, moved: false }; event.currentTarget.setPointerCapture?.(event.pointerId); };
+  const handleTabPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => { const pointer = tabPointerRef.current; if (!pointer) return; if (Math.abs(event.movementX) + Math.abs(event.movementY) > 3) pointer.moved = true; if (!pointer.moved) return; setDraggingTabId(pointer.id); const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tab-id]"); const targetId = element ? Number(element.dataset.tabId) : null; if (targetId && targetId !== pointer.id) reorderTab(pointer.id, targetId); };
+  const handleTabPointerUp = () => { tabPointerRef.current = null; setDraggingTabId(null); };
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -402,7 +422,7 @@ export default function Home() {
         <div className="tab-strip">
           <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="" /></button>
           <div className="tabs">
-            {tabs.map((tab) => <button key={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={(event) => { if (tabPointerRef.current?.moved) { tabPointerRef.current = null; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
           <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
@@ -438,7 +458,6 @@ export default function Home() {
         <input ref={fileInput} type="file" hidden onChange={handleFile} />
         <input ref={backupInput} type="file" accept="application/json,.json" hidden onChange={importLocalData} />
       </main>
-      {privacyNoticeOpen ? <PrivacyNotice onDismiss={() => setPrivacyNoticeOpen(false)} onReview={() => openSettingsSection("permissions")} /> : null}
       {confirmAction ? <ConfirmDialog action={confirmAction} onCancel={() => setConfirmAction(null)} onConfirm={() => { confirmAction.onConfirm(); setConfirmAction(null); }} /> : null}
       {toast ? <div className="toast-note" role="status"><Check size={14} />{toast}</div> : null}
     </div>
