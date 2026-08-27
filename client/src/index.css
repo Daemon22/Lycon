@@ -117,14 +117,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 .content-scroll { min-height: 0; flex: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background)), hsl(266 22% 10% / .3)); }
 .page { min-height: 100%; padding: clamp(31px, 7vw, 72px) clamp(22px, 6vw, 78px); animation: page-in .25s cubic-bezier(.23,1,.32,1) both; }
-.start-page { padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(90deg, hsl(var(--background) / .99), hsl(var(--background) / .96)), url("/manus-storage/lycon-hero-field_3c45a384.jpg") center / cover; }
+.start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-position: center center; }
 .hero { max-width: 950px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(190px, .72fr); align-items: center; gap: clamp(35px, 8vw, 112px); }
 .hero-copy-wrap { max-width: 570px; }
 .eyebrow { color: hsl(var(--accent)); font: 10px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; }
 .hero h1 { max-width: 610px; margin: 16px 0 19px; color: hsl(var(--foreground)); font: 600 clamp(43px, 6vw, 78px)/.96 var(--font-display); letter-spacing: -.078em; }
 .hero h1 em { color: hsl(var(--primary)); font-style: normal; }
-.hero-copy { max-width: 505px; margin: 0 0 25px; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.8; }
-.hero-search { max-width: 540px; height: 47px; padding-left: 14px; background: hsl(var(--card) / .73); box-shadow: 0 18px 44px hsl(255 25% 3% / .19); }
+.hero-copy { max-width: 505px; margin: 0 0 25px; color: hsl(var(--foreground) / .78); font-size: 14px; line-height: 1.8; text-shadow: 0 1px 18px hsl(255 25% 3% / .8); }
+.hero-search { max-width: 540px; height: 47px; padding-left: 14px; background: hsl(var(--card) / .86); box-shadow: 0 18px 44px hsl(255 25% 3% / .34); }
 .hero-search .address-input { font-family: var(--font-body); font-size: 13px; }
 .hero-search-icon { flex: none; color: hsl(var(--primary)); }
 .primary-btn, .secondary-btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 13px; border-radius: 7px; font: 600 11px var(--font-body); transition: color .18s ease, background .18s ease, border-color .18s ease, transform .16s ease; }
