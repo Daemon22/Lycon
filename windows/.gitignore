@@ -1,0 +1,4 @@
+# Build artifacts
+bin/
+obj/
+"# If only building on Windows

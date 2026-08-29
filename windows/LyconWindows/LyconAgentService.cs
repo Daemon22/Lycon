@@ -166,8 +166,9 @@ public sealed class LyconAgentService
         };
     }
 
-    private string ReadSecret(string id)
+    private string ReadSecret(string? id)
     {
+        if (string.IsNullOrEmpty(id)) return "";
         try { return _vault.Retrieve(ResourcePrefix + id, id).Password; } catch { return ""; }
     }
     private static void AddAuthorization(HttpRequestMessage request, string secret)

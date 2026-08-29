@@ -23,6 +23,7 @@ public class LyconShieldsService
 
     public bool IsEnabled { get; set; } = true;
     public int TotalBlocked { get; private set; }
+    public bool IsLoaded => _loaded;
 
     public LyconShieldsService()
     {

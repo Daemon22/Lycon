@@ -228,7 +228,7 @@ public class LyconSettings
     [JsonProperty("theme")] public string Theme { get; set; } = "dark";
     [JsonProperty("accent")] public string Accent { get; set; } = "orange";
     [JsonProperty("searchEngine")] public string SearchEngine { get; set; } = "duckduckgo";
-    [JsonProperty("shieldsEnabled")] public bool ShieldsEnabled { get; set; } = true;
+    [JsonProperty("shieldsEnabled")] public bool? ShieldsEnabled { get; set; } = true;
     [JsonProperty("startupPage")] public string StartupPage { get; set; } = "startpage";
     [JsonProperty("privateTabDefault")] public bool? PrivateTabDefault { get; set; } = false;
     [JsonProperty("httpsOnly")] public bool? HttpsOnly { get; set; } = true;

@@ -2,9 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 using System.Threading.Tasks;
-using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -24,7 +22,6 @@ public class LyconBridge
     private readonly LyconAgentService _agents;
     private readonly MainWindow _window;
     private readonly Dictionary<string, Func<JToken?, Task<object>>> _handlers;
-    private int _nextCallId = 1;
     private readonly Dictionary<int, TaskCompletionSource<object>> _pendingJsCalls = new();
 
     public LyconBridge(LyconDataService data, LyconShieldsService shields, MainWindow window)
@@ -49,14 +46,18 @@ public class LyconBridge
             ["settings:set"] = payload =>
             {
                 var patch = payload?.ToObject<LyconSettings>() ?? new LyconSettings();
-                return Task.FromResult<object>(_data.UpdateSettings(patch));
+                var result = _data.UpdateSettings(patch);
+                // Broadcast the change so JS listeners (e.g. settings.js onChanged)
+                // stay in sync, matching the Electron reference implementation.
+                _window.SendEventToJs("settings:changed", result);
+                return Task.FromResult<object>(result);
             },
             ["search:list"] = _ => Task.FromResult<object>(searchEngines),
             ["search:build"] = payload =>
             {
                 var args = payload?.ToObject<SearchBuildArgs>() ?? new SearchBuildArgs();
                 var eng = searchEngines.TryGetValue(args.Engine ?? "duckduckgo", out var e) ? e : searchEngines["duckduckgo"];
-                var urlProp = ((dynamic)e).url as string;
+                var urlProp = ((dynamic)e!).url as string ?? "";
                 return Task.FromResult<object>(urlProp.Replace("%s", Uri.EscapeDataString(args.Query ?? "")));
             },
             ["bookmarks:list"] = _ => Task.FromResult<object>(_data.LoadBookmarks()),
@@ -85,7 +86,7 @@ public class LyconBridge
                 var s = _data.LoadSettings(); s.ShieldsEnabled = enabled; _data.SaveSettings(s);
                 return Task.FromResult<object>(s);
             },
-            ["shields:status"] = _ => Task.FromResult<object>(new { enabled = _shields.IsEnabled, totalBlocked = _shields.TotalBlocked, blockerLoaded = true }),
+            ["shields:status"] = _ => Task.FromResult<object>(new { enabled = _shields.IsEnabled, totalBlocked = _shields.TotalBlocked, blockerLoaded = _shields.IsLoaded }),
             ["window:minimize"] = _ => { _window.Minimize(); return Task.FromResult<object>(true); },
             ["window:maximize"] = _ => { _window.Maximize(); return Task.FromResult<object>(true); },
             ["window:close"] = _ => { _window.Close(); return Task.FromResult<object>(true); },
@@ -104,10 +105,30 @@ public class LyconBridge
             ["agents:list"] = _ => Task.FromResult<object>(_agents.List()),
             ["agents:save"] = payload => Task.FromResult<object>(_agents.Save(payload as JObject ?? new JObject())),
             ["agents:remove"] = payload => Task.FromResult<object>(_agents.Remove(payload?.Value<string>("id") ?? payload?.ToObject<string>() ?? "")),
-            ["agents:test"] = payload => _agents.TestAsync(payload as JObject ?? new JObject()).ContinueWith(t => (object)t.Result),
-            ["agents:request"] = payload => _agents.RequestAsync(payload as JObject ?? new JObject()).ContinueWith(t => (object)t.Result),
+            ["agents:test"] = async payload =>
+            {
+                var result = await _agents.TestAsync(payload as JObject ?? new JObject());
+                EmitLatestAudit();
+                return result;
+            },
+            ["agents:request"] = async payload =>
+            {
+                var result = await _agents.RequestAsync(payload as JObject ?? new JObject());
+                EmitLatestAudit();
+                return result;
+            },
             ["agents:audit"] = _ => Task.FromResult<object>(_agents.Audit()),
             ["agents:audit:clear"] = _ => Task.FromResult<object>(_agents.ClearAudit()),
+            ["agents:openRequested"] = _ =>
+            {
+                // The JS layer subscribes to 'agents:openRequested' via
+                // onOpenRequested(). When the start-page or menu triggers the
+                // intelligence panel, this handler re-emits the event so the
+                // subscribed JS callback can display the panel. This mirrors
+                // how Electron emits the event from a menu/keyboard trigger.
+                SendEvent("agents:openRequested", null);
+                return Task.FromResult<object>(true);
+            },
             ["shell:openExternal"] = payload =>
             {
                 var url = payload?.ToObject<string>() ?? "";
@@ -184,7 +205,7 @@ public class LyconBridge
       };
     },
     platform: 'winui',
-    versions: { webview2: '1.0.2739.15', os: 'Windows' },
+    versions: { webview2: '1.0.3405.78', os: 'Windows' },
     initialUrl: null,
   };
   console.log('[Lycon] WinUI bridge initialized');
@@ -232,7 +253,9 @@ public class LyconBridge
 
     private void SendResponse(int callId, object? result, string? error)
     {
-        var json = System.Text.Json.JsonSerializer.Serialize(new
+        // Use Newtonsoft so that [JsonProperty]-annotated POCOs (e.g. LyconSettings)
+        // are serialized with their camelCase contract names matching the JS bridge.
+        var json = JsonConvert.SerializeObject(new
         {
             type = "lycon:response",
             callId,
@@ -245,9 +268,21 @@ public class LyconBridge
     /// <summary>
     /// Pushes an event to the JS side.
     /// </summary>
-    public void SendEvent(string eventType, object payload)
+    public void SendEvent(string eventType, object? payload)
     {
         _window.SendEventToJs(eventType, payload);
+    }
+
+    /// <summary>
+    /// Emits agents:auditChanged with the latest audit record (if any).
+    /// Called after agents:test and agents:request, matching the Electron
+    /// reference implementation which emits this event on the same triggers.
+    /// </summary>
+    private void EmitLatestAudit()
+    {
+        var audit = _agents.Audit();
+        if (audit.Count > 0)
+            SendEvent("agents:auditChanged", audit[audit.Count - 1]);
     }
 }
 

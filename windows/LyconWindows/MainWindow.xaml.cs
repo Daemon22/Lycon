@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using Newtonsoft.Json;
 using Windows.Storage;
 
 namespace LyconWindows;
@@ -33,20 +35,32 @@ public sealed partial class MainWindow : Window
         _shields = new LyconShieldsService();
         _bridge = new LyconBridge(_dataService, _shields, this);
 
+        // Keyboard-shortcut support (e.g. Ctrl+Shift+A to open the intelligence
+        // panel → 'agents:openRequested') is not available via the WinUI 3
+        // Window.KeyboardAccelerators API in the WindowsAppSDK 1.7 projection.
+        // The event can still be triggered programmatically or via an
+        // invoke('agents:openRequested') call routed through the bridge.
+
         // Restore window state
         var state = _dataService.LoadWindowState();
         if (state != null)
         {
             try
             {
-                this.Width = state.Width;
-                this.Height = state.Height;
+                this.AppWindow.Resize(new Windows.Graphics.SizeInt32
+                {
+                    Width = (int)state.Width,
+                    Height = (int)state.Height
+                });
                 if (state.X >= 0 && state.Y >= 0)
                 {
-                    var pos = this.AppWindow;
-                    pos.Move(new Windows.Graphics.PointInt32(state.X, state.Y));
+                    this.AppWindow.Move(new Windows.Graphics.PointInt32(state.X, state.Y));
                 }
-                if (state.Maximized) this.Presenter.Maximize();
+                if (state.Maximized)
+                {
+                    var presenter = this.AppWindow.Presenter as OverlappedPresenter;
+                    presenter?.Maximize();
+                }
             }
             catch { /* ignore restore errors */ }
         }
@@ -66,6 +80,11 @@ public sealed partial class MainWindow : Window
         core.Settings.AreDefaultContextMenusEnabled = true;
         core.Settings.IsStatusBarEnabled = true;
         core.Settings.AreBrowserAcceleratorKeysEnabled = true;
+
+        // Initialise the shields service so ad-blocking / HTTPS-upgrades work.
+        // Previously InitializeAsync was never awaited, leaving _loaded == false
+        // and ShouldBlock() always returning false (shields effectively dead).
+        await _shields.InitializeAsync();
 
         // Set up download handling
         core.DownloadStarting += Core_DownloadStarting;
@@ -95,12 +114,21 @@ public sealed partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private async void Core_DownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)
+    private void Core_DownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)
     {
         // Route the download through Lycon's download manager
-        var downloadsFolder = KnownFolders.Downloads.Path;
-        var filename = e.ResultFileName;
-        if (string.IsNullOrWhiteSpace(filename) || Path.GetFileName(filename) == "")
+        // KnownFolders.Downloads is not projected by WindowsAppSDK 1.7; use the
+        // user's Downloads folder directly via Environment.SpecialFolder.
+        var downloadsFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        if (!Directory.Exists(downloadsFolder))
+            Directory.CreateDirectory(downloadsFolder);
+        // WebView2 1.0.3405.78 no longer exposes ResultFileName/FileName directly
+        // on the DownloadStarting event args; derive the filename from the URL.
+        var downloadUrl = e.DownloadOperation.Uri ?? "";
+        var filename = "";
+        try { filename = Path.GetFileName(new Uri(downloadUrl).AbsolutePath); } catch { }
+        if (string.IsNullOrWhiteSpace(filename))
             filename = "lycon-download.bin";
         var savePath = Path.Combine(downloadsFolder, Path.GetFileName(filename));
 
@@ -108,7 +136,7 @@ public sealed partial class MainWindow : Window
         var record = new
         {
             id = Guid.NewGuid().ToString("N"),
-            url = e.Uri ?? "",
+            url = e.DownloadOperation.Uri ?? "",
             filename = Path.GetFileName(savePath),
             savePath,
             total = 0L,
@@ -119,7 +147,7 @@ public sealed partial class MainWindow : Window
         };
         _bridge.SendEvent("downloads:new", record);
 
-        op.StateChanged += async (s, _) =>
+        op.StateChanged += (s, _) =>
         {
             var state = s.State switch
             {
@@ -150,10 +178,15 @@ public sealed partial class MainWindow : Window
         };
     }
 
-    private void BrowserWebView_NavigationStarting(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationStartingEventArgs args)
+    // Event-handler delegates use `object sender` because the event args
+    // types come from the WebView2 core namespace, not the XAML control
+    // type. This keeps the handlers decoupled from the host control type
+    // and avoids any dependency on colliding projections.
+
+    private void BrowserWebView_NavigationStarting(object sender, CoreWebView2NavigationStartingEventArgs args)
     {
         // HTTPS-Only mode: upgrade http:// to https://
-        if (_dataService.LoadSettings().HttpsOnly && args.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        if ((_dataService.LoadSettings().HttpsOnly ?? false) && args.Uri.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
         {
             try
             {
@@ -185,12 +218,12 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void BrowserWebView_NavigationCompleted(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs args)
+    private void BrowserWebView_NavigationCompleted(object sender, CoreWebView2NavigationCompletedEventArgs args)
     {
         // Could update loading state here
     }
 
-    private void BrowserWebView_WebMessageReceived(WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+    private void BrowserWebView_WebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
     {
         // Messages from JS arrive here. The bridge script in __lyconNative
         // posts messages for invoke() calls; we route them to the bridge.
@@ -209,11 +242,12 @@ public sealed partial class MainWindow : Window
     {
         var state = new WindowState
         {
-            Width = this.Width,
-            Height = this.Height,
+            Width = this.AppWindow.ClientSize.Width,
+            Height = this.AppWindow.ClientSize.Height,
             X = this.AppWindow.Position.X,
             Y = this.AppWindow.Position.Y,
-            Maximized = false, // TODO: detect maximize state
+            Maximized = (this.AppWindow.Presenter as OverlappedPresenter)?.State
+                        == OverlappedPresenterState.Maximized,
         };
         _dataService.SaveWindowState(state);
     }
@@ -221,10 +255,10 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Sends an event payload to the JS side via postMessage.
     /// </summary>
-    public void SendEventToJs(string eventType, object payload)
+    public void SendEventToJs(string eventType, object? payload)
     {
         if (!_webviewReady) return;
-        var json = System.Text.Json.JsonSerializer.Serialize(new
+        var json = JsonConvert.SerializeObject(new
         {
             type = "lycon:event",
             @event = eventType,
@@ -243,22 +277,28 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Minimize the window.</summary>
-    public void Minimize() => this.Presenter.Minimize();
+    public void Minimize()
+    {
+        var presenter = this.AppWindow.Presenter as OverlappedPresenter;
+        presenter?.Minimize();
+    }
 
     /// <summary>Toggle maximize/restore.</summary>
     public void Maximize()
     {
-        if (this.Presenter.Kind == Microsoft.UI.Windowing.OverlappedPresenterKind.Maximized)
-            this.Presenter.Restore();
+        var presenter = this.AppWindow.Presenter as OverlappedPresenter;
+        if (presenter == null) return;
+        if (presenter.State == OverlappedPresenterState.Maximized)
+            presenter.Restore();
         else
-            this.Presenter.Maximize();
+            presenter.Maximize();
     }
 }
 
-internal class WindowState
+public class WindowState
 {
     public double Width { get; set; } = 1280;
-    public double Height { get; set; } = 820;
+    public double Height { get; set; } = 800;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
     public bool Maximized { get; set; }
