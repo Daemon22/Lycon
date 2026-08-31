@@ -411,3 +411,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .start-page { min-height: 100%; background: transparent; background-image: none; }
 .lycon-sidebar { background: linear-gradient(180deg, hsl(var(--sidebar) / .82), hsl(var(--sidebar) / .66)); }
 @media (max-width: 700px) { .lycon-app { background-attachment: scroll; background-position: 60% center; } }
+
+/* Internal views share the same full-bleed field image as Start; translucent view washes preserve depth without introducing a second image. */
+.library-page, .settings-page { background: linear-gradient(180deg, rgba(9,10,14,.16), rgba(9,10,14,.38)); }
+.library-page::after, .settings-page::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(9,10,14,.12), transparent 42%, rgba(9,10,14,.14)); }
+.library-page > *, .settings-page > * { position: relative; z-index: 1; }
+.list-panel, .settings-layout, .search-results, .search-filters, .search-subfilters { backdrop-filter: blur(12px); }
+.list-panel, .settings-panel, .search-result, .setting-note, .backup-card { background-color: rgba(18,20,24,.56); }
+.mode-private .library-page, .mode-private .settings-page { background: linear-gradient(180deg, rgba(18,12,8,.16), rgba(18,12,8,.42)); }

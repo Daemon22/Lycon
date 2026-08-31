@@ -8,3 +8,6 @@
 
 - [x] Make each mode background a single full-bleed layer across the app without repeats or visual cuts.
 - [x] Verify full-bleed composition on desktop and mobile.
+
+- [x] Apply the continuous mode-aware background treatment to Bookmarks, History, Downloads, and Settings.
+- [x] Verify internal-view content remains readable on desktop and mobile.

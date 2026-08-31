@@ -277,6 +277,15 @@ export default function Home() {
   }, [activeTabId]);
 
   useEffect(() => {
+    const initialRoute = viewFromPath(window.location.pathname);
+    if (window.location.pathname !== "/" && initialRoute !== "start") {
+      const label = initialRoute[0].toUpperCase() + initialRoute.slice(1);
+      const routedPage: PageRecord = { title: label, url: `lycon://${initialRoute}`, kind: "local", view: initialRoute };
+      setCurrentView(initialRoute);
+      setActivePage(routedPage);
+      setAddress("");
+      return;
+    }
     const restoredTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
     if (!restoredTab) return;
     const restoredPage = restoredTab.history[restoredTab.historyIndex] ?? restoredTab.history[0];
