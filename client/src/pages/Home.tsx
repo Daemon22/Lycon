@@ -132,7 +132,7 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday", visitedAt: Date.now() - 1000 * 60 * 60 * 26 },
 ];
 
-const initialTabs: Tab[] = [  { id: 1, title: "Start", isPrivate: false, favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png", history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" }], historyIndex: 0 }];
+const initialTabs: Tab[] = [  { id: 1, title: "Start", isPrivate: false, favicon: "/assets/lycon-logo.png", history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" }], historyIndex: 0 }];
 
 const defaultSettings: SettingsState = {
   theme: "dark",
@@ -214,13 +214,13 @@ function createDestination(value: string): PageRecord {
     "lycon://settings": "settings",
   };
   const normalized = trimmed.toLowerCase().replace(/^\//, "");
-  if (localRoutes[normalized]) return { title: normalized, url: `lycon://${normalized}`, kind: "local", view: localRoutes[normalized], favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+  if (localRoutes[normalized]) return { title: normalized, url: `lycon://${normalized}`, kind: "local", view: localRoutes[normalized], favicon: "/assets/lycon-logo.png" };
   if (/^(https?:\/\/|www\.)/i.test(trimmed)) {
     const url = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed;
     const domain = url.replace(/^https?:\/\//, "").split("/")[0];
     return { title: domain, url, kind: "online", favicon: `https://${domain}/favicon.ico` };
   }
-  return { title: `Search: ${trimmed}`, url: `lycon://search?q=${encodeURIComponent(trimmed)}`, kind: "search", view: "search", query: trimmed, favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+  return { title: `Search: ${trimmed}`, url: `lycon://search?q=${encodeURIComponent(trimmed)}`, kind: "search", view: "search", query: trimmed, favicon: "/assets/lycon-logo.png" };
 }
 
 export default function Home() {
@@ -434,7 +434,7 @@ export default function Home() {
 
   const newPrivateTab = () => {
     const id = Date.now();
-    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
     setTabs((previous) => [...previous, { id, title: "Private", isPrivate: true, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
     setActiveTabId(id);
     setCurrentView("start");
@@ -446,7 +446,7 @@ export default function Home() {
 
   const newTab = () => {
     const id = Date.now();
-    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/manus-storage/lycon-canonical-logo_647e2a05.png" };
+    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
     setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
     setActiveTabId(id);
     setCurrentView("start");
@@ -564,9 +564,9 @@ export default function Home() {
     <div className="lycon-app" style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
       <main className="lycon-main">
         <div className="tab-strip">
-          <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="" /></button>
+          <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/assets/lycon-logo.png" alt="" /></button>
           <div className="tabs">
-            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""} ${pressingTabId === tab.id ? "long-pressing" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { if (suppressTabClickRef.current) { suppressTabClickRef.current = false; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <CachedFavicon className="tab-favicon" src={tab.favicon ?? tab.history[tab.historyIndex]?.favicon ?? (tab.history[tab.historyIndex]?.kind === "online" ? `https://${new URL(tab.history[tab.historyIndex]?.url ?? "https://example.com").hostname}/favicon.ico` : "/manus-storage/lycon-canonical-logo_647e2a05.png")} /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""} ${pressingTabId === tab.id ? "long-pressing" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { if (suppressTabClickRef.current) { suppressTabClickRef.current = false; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <CachedFavicon className="tab-favicon" src={tab.favicon ?? tab.history[tab.historyIndex]?.favicon ?? (tab.history[tab.historyIndex]?.kind === "online" ? `https://${new URL(tab.history[tab.historyIndex]?.url ?? "https://example.com").hostname}/favicon.ico` : "/assets/lycon-logo.png")} /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
           <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
@@ -587,7 +587,7 @@ export default function Home() {
           <button className="icon-btn" onClick={togglePrivate} aria-label="Toggle private mode"><EyeOff size={17} /></button>
         </div>
 
-        <div className={`content-scroll ${splitViewOpen ? "content-split-open" : ""}`}>
+        <div className={`content-scroll mode-${shellState} ${splitViewOpen ? "content-split-open" : ""}`}>
           <div className="primary-content">
           {currentView === "start" && <StartView />}
           {currentView === "search" && <SearchView page={activePage} bookmarks={bookmarks} historyEntries={historyEntries} downloads={downloads} onOpen={(url) => navigateTo(createDestination(url))} />}

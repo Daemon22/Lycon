@@ -2,7 +2,7 @@ import { ArrowUpRight, Moon, Sun } from "lucide-react";
 import { Link } from "wouter";
 import { useLyconTheme } from "../contexts/LyconThemeContext";
 
-const wolfLogo = "/manus-storage/lycon-wolf-logo_b005ce17.png";
+const wolfLogo = "/assets/lycon-logo.png";
 
 export function LyconHeader() {
   const { theme, toggleTheme } = useLyconTheme();

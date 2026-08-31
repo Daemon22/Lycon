@@ -300,7 +300,7 @@ export default function Home() {
     <div className="lycon-app">
       <aside className="lycon-sidebar">
         <div className="brand-lockup">
-          <img className="brand-mark" src="/manus-storage/lycon-canonical-logo_647e2a05.png" alt="Lycon wolf mark" />
+          <img className="brand-mark" src="/assets/lycon-logo.png" alt="Lycon wolf mark" />
           <div className="brand-copy"><strong>LYCON</strong><span>LOCAL BY DEFAULT</span></div>
         </div>
         <div className="side-label">LIBRARY</div>

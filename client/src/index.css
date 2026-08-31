@@ -68,7 +68,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .sidebar-collapsed .brand-lockup { justify-content: center; padding-inline: 0; }
 .sidebar-collapsed .brand-copy, .sidebar-collapsed .side-label, .sidebar-collapsed .nav-item span, .sidebar-collapsed .sidebar-footnote { display: none; }
 .sidebar-collapsed .nav-item { justify-content: center; padding-inline: 0; }
-.lycon-sidebar { width: 194px; flex: 0 0 194px; display: flex; flex-direction: column; padding: 22px 13px 15px; border-right: 1px solid hsl(var(--border) / .65); background: linear-gradient(180deg, hsl(var(--sidebar) / .98), hsl(var(--sidebar) / .94)), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-blend-mode: normal, soft-light; }
+.lycon-sidebar { width: 194px; flex: 0 0 194px; display: flex; flex-direction: column; padding: 22px 13px 15px; border-right: 1px solid hsl(var(--border) / .65); background: linear-gradient(180deg, hsl(var(--sidebar) / .98), hsl(var(--sidebar) / .94)), url("/assets/lycon-public-forest.jpg") center / cover; background-blend-mode: normal, soft-light; }
 .brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 7px 28px; }
 .brand-mark { width: 37px; height: 37px; object-fit: contain; filter: drop-shadow(0 5px 13px hsl(var(--accent) / .3)); }
 .brand-copy { display: grid; gap: 3px; }
@@ -149,7 +149,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .private-ink { color: hsl(var(--accent)); }
 .muted-ink { color: hsl(var(--muted-foreground)); }
 
-.content-scroll { min-height: 0; flex: 1; position: relative; z-index: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background) / .96), hsl(266 22% 10% / .82)), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-blend-mode: normal, soft-light; }
+.content-scroll { min-height: 0; flex: 1; position: relative; z-index: 1; overflow: auto; background: linear-gradient(130deg, hsl(var(--background) / .96), hsl(266 22% 10% / .82)), url("/assets/lycon-public-forest.jpg") center / cover; background-blend-mode: normal, soft-light; }
 .content-split-open { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 0; }
 .primary-content { min-width: 0; min-height: 100%; }
 .split-pane { min-width: 0; padding: 24px 17px; border-left: 1px solid hsl(var(--border) / .72); background: hsl(var(--card) / .35); }
@@ -161,7 +161,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .page { min-height: 100%; padding: clamp(31px, 7vw, 72px) clamp(22px, 6vw, 78px); animation: page-in .25s cubic-bezier(.23,1,.32,1) both; }
 .page:not(.start-page) { position: relative; }
 .page:not(.start-page)::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 82% 0%, hsl(var(--primary) / .08), transparent 34%); }
-.start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/manus-storage/lycon-forest-hero_8f2a2ee5.jpg") center / cover; background-position: center center; }
+.start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/preview/lycon-public-forest.jpg") center / cover; background-position: center center; } .mode-private .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .92) 0%, hsl(var(--background) / .46) 38%, hsl(var(--background) / .94) 100%), url("/preview/lycon-private-wolf-den.jpg"); } .mode-online .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/preview/lycon-public-forest.jpg"); }
 .hero { max-width: 1000px; margin: 0 auto; display: block; }
 .hero-copy-wrap { max-width: 700px; }
 .eyebrow { color: hsl(var(--accent)); font: 10px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; }
@@ -302,7 +302,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .toggle.on { background: hsl(var(--primary) / .65); }
 .toggle.on span { background: hsl(var(--primary-foreground)); transform: translateX(15px); }
 
-.online-page { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(180deg, hsl(var(--background) / .97), hsl(var(--background) / .99)), url("/manus-storage/lycon-handoff-glow_53332490.jpg") center / cover; }
+.online-page { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(180deg, hsl(var(--background) / .97), hsl(var(--background) / .99)), url("/assets/lycon-public-forest.jpg") center / cover; }
 .online-visual { width: 47px; height: 47px; display: grid; place-items: center; margin-bottom: 17px; color: hsl(var(--primary)); border: 1px solid hsl(var(--primary) / .38); border-radius: 13px; background: hsl(var(--primary) / .1); box-shadow: 0 0 32px hsl(var(--primary) / .1); }
 .online-page h1 { margin: 12px 0 14px; font: 600 clamp(30px, 4vw, 48px)/1 var(--font-display); letter-spacing: -.055em; }
 .online-page > p { max-width: 450px; margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.7; }
