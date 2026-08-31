@@ -7,6 +7,7 @@ let persistenceFailure = false;
 
 vi.mock("./db", () => ({
   getLibrarySnapshot: vi.fn(async () => snapshot && { id: 1, userId: 987654, ...snapshot, createdAt: new Date(), updatedAt: new Date() }),
+  deleteLibrarySnapshot: vi.fn(async () => { if (persistenceFailure) throw new Error("Database is not available"); snapshot = undefined; return { deleted: true as const }; }),
   putLibrarySnapshot: vi.fn(async (userId: number, payload: string, baseRevision: number) => {
     if (persistenceFailure) throw new Error("Database is not available");
     if (snapshot && snapshot.revision !== baseRevision) {
@@ -55,6 +56,7 @@ describe("library snapshots", () => {
 
     const loaded = await caller.library.get();
     expect(loaded).toEqual({ revision: 1, payload });
+    await expect(caller.library.export()).resolves.toEqual({ revision: 1, payload });
 
     const staleWrite = await caller.library.put({ baseRevision: 0, payload: JSON.stringify({ version: 1, bookmarks: [] }) });
     expect(staleWrite.ok).toBe(false);
@@ -66,6 +68,20 @@ describe("library snapshots", () => {
     persistenceFailure = true;
     const caller = appRouter.createCaller(createContext());
     await expect(caller.library.put({ baseRevision: 0, payload: JSON.stringify({ version: 1 }) })).rejects.toThrow("Database is not available");
+    persistenceFailure = false;
+  });
+
+  it("deletes only the authenticated account snapshot", async () => {
+    snapshot = { revision: 1, payload: JSON.stringify({ version: 1, bookmarks: [{ id: "bookmark-1" }] }) };
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.library.remove()).resolves.toEqual({ deleted: true });
+    await expect(caller.library.get()).resolves.toEqual({ revision: 0, payload: "" });
+  });
+
+  it("surfaces account deletion failures", async () => {
+    persistenceFailure = true;
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.library.remove()).rejects.toThrow("Database is not available");
     persistenceFailure = false;
   });
 });

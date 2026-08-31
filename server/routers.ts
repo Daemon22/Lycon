@@ -1,7 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { getLibrarySnapshot, putLibrarySnapshot } from "./db";
+import { deleteLibrarySnapshot, getLibrarySnapshot, putLibrarySnapshot } from "./db";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 
@@ -19,6 +19,11 @@ export const appRouter = router({
     }),
   }),
   library: router({
+    remove: protectedProcedure.mutation(async ({ ctx }) => deleteLibrarySnapshot(ctx.user.id)),
+    export: protectedProcedure.query(async ({ ctx }) => {
+      const snapshot = await getLibrarySnapshot(ctx.user.id);
+      return snapshot ? { revision: snapshot.revision, payload: snapshot.payload } : { revision: 0, payload: "" };
+    }),
     get: protectedProcedure.query(async ({ ctx }) => {
       const snapshot = await getLibrarySnapshot(ctx.user.id);
       return snapshot ? { revision: snapshot.revision, payload: snapshot.payload } : { revision: 0, payload: "" };

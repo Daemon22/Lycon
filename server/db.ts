@@ -96,6 +96,13 @@ export async function getLibrarySnapshot(userId: number) {
   return result[0];
 }
 
+export async function deleteLibrarySnapshot(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.delete(librarySnapshots).where(eq(librarySnapshots.userId, userId));
+  return { deleted: true as const };
+}
+
 export async function putLibrarySnapshot(userId: number, payload: string, baseRevision: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");

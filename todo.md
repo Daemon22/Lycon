@@ -17,3 +17,7 @@
 - [x] Add view-specific background focal points and smooth public/private crossfades.
 - [x] Verify persistence, visuals, responsive states, and error handling.
 - [x] Commit and push the completed changes to GitHub.
+
+- [x] Add protected account snapshot export and deletion procedures.
+- [x] Add Settings export control and destructive deletion confirmation flow.
+- [x] Test account snapshot controls, error handling, and responsive Settings layout.
