@@ -5,3 +5,6 @@
 - [x] Rebuild the toolbar controls from the supplied reference, including navigation, address search, microphone, sync, bookmark, shields, and private toggle.
 - [x] Remove the duplicate right-side logo while retaining the upper-left Lycon brand mark.
 - [x] Verify public and private states, responsive layouts, and stable asset rendering.
+
+- [x] Make each mode background a single full-bleed layer across the app without repeats or visual cuts.
+- [x] Verify full-bleed composition on desktop and mobile.
