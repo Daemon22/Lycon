@@ -13,7 +13,7 @@
 - [x] Verify internal-view content remains readable on desktop and mobile.
 
 - [x] Upgrade the static project to the production persistence architecture.
-- [ ] Persist bookmarks, history, downloads, tabs, and settings through the production data layer.
+- [x] Persist bookmarks, history, downloads, tabs, and settings through the production data layer.
 - [x] Add view-specific background focal points and smooth public/private crossfades.
-- [ ] Verify persistence, visuals, responsive states, and error handling.
-- [ ] Commit and push the completed changes to GitHub.
+- [x] Verify persistence, visuals, responsive states, and error handling.
+- [x] Commit and push the completed changes to GitHub.

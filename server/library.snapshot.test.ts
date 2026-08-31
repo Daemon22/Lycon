@@ -3,10 +3,12 @@ import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
 
 let snapshot: { revision: number; payload: string } | undefined;
+let persistenceFailure = false;
 
 vi.mock("./db", () => ({
   getLibrarySnapshot: vi.fn(async () => snapshot && { id: 1, userId: 987654, ...snapshot, createdAt: new Date(), updatedAt: new Date() }),
   putLibrarySnapshot: vi.fn(async (userId: number, payload: string, baseRevision: number) => {
+    if (persistenceFailure) throw new Error("Database is not available");
     if (snapshot && snapshot.revision !== baseRevision) {
       return { ok: false as const, conflict: snapshot };
     }
@@ -36,6 +38,7 @@ function createContext(): TrpcContext {
 describe("library snapshots", () => {
   it("round-trips the complete authenticated library payload and detects stale writes", async () => {
     snapshot = undefined;
+    persistenceFailure = false;
     const caller = appRouter.createCaller(createContext());
     const payload = JSON.stringify({
       version: 1,
@@ -56,5 +59,13 @@ describe("library snapshots", () => {
     const staleWrite = await caller.library.put({ baseRevision: 0, payload: JSON.stringify({ version: 1, bookmarks: [] }) });
     expect(staleWrite.ok).toBe(false);
     if (!staleWrite.ok) expect(staleWrite.conflict.payload).toBe(payload);
+  });
+
+  it("surfaces persistence failures to the caller", async () => {
+    snapshot = undefined;
+    persistenceFailure = true;
+    const caller = appRouter.createCaller(createContext());
+    await expect(caller.library.put({ baseRevision: 0, payload: JSON.stringify({ version: 1 }) })).rejects.toThrow("Database is not available");
+    persistenceFailure = false;
   });
 });
