@@ -419,3 +419,19 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .list-panel, .settings-layout, .search-results, .search-filters, .search-subfilters { backdrop-filter: blur(12px); }
 .list-panel, .settings-panel, .search-result, .setting-note, .backup-card { background-color: rgba(18,20,24,.56); }
 .mode-private .library-page, .mode-private .settings-page { background: linear-gradient(180deg, rgba(18,12,8,.16), rgba(18,12,8,.42)); }
+
+/* Crossfaded mode layers and deliberate per-view framing. */
+.lycon-app { position: relative; background: #090a0e; }
+.lycon-app::before, .lycon-app::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; background-repeat: no-repeat; background-size: cover; background-attachment: fixed; transition: opacity 560ms cubic-bezier(.77,0,.175,1), background-position 360ms cubic-bezier(.23,1,.32,1); }
+.lycon-app::before { opacity: 1; background-image: linear-gradient(110deg, rgba(9,10,14,.96), rgba(9,10,14,.55)), url("/manus-storage/lycon-public-forest_ff72073a.jpg"); background-position: center center; }
+.lycon-app::after { opacity: 0; background-image: linear-gradient(110deg, rgba(12,9,7,.96), rgba(12,9,7,.54)), url("/manus-storage/lycon-private-cave_b05760f2.jpg"); background-position: center center; }
+.lycon-app.mode-private::before { opacity: 0; }
+.lycon-app.mode-private::after { opacity: 1; }
+.lycon-app > * { position: relative; z-index: 1; }
+.lycon-app.view-bookmarks::before, .lycon-app.view-bookmarks::after { background-position: 62% center; }
+.lycon-app.view-history::before, .lycon-app.view-history::after { background-position: 52% 42%; }
+.lycon-app.view-downloads::before, .lycon-app.view-downloads::after { background-position: 42% center; }
+.lycon-app.view-settings::before, .lycon-app.view-settings::after { background-position: 68% center; }
+.lycon-app.view-search::before, .lycon-app.view-search::after { background-position: 58% 36%; }
+@media (max-width: 700px) { .lycon-app::before, .lycon-app::after { background-attachment: scroll; } .lycon-app.view-bookmarks::before, .lycon-app.view-bookmarks::after { background-position: 62% center; } .lycon-app.view-history::before, .lycon-app.view-history::after { background-position: 48% 46%; } .lycon-app.view-downloads::before, .lycon-app.view-downloads::after { background-position: 38% center; } .lycon-app.view-settings::before, .lycon-app.view-settings::after { background-position: 70% center; } }
+@media (prefers-reduced-motion: reduce) { .lycon-app::before, .lycon-app::after { transition: none; } }

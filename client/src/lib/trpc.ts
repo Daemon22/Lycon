@@ -1,2 +1,4 @@
-// Static compatibility layer: the browser keeps its state locally in this website build.
-export const trpc = {} as const;
+import { createTRPCReact } from "@trpc/react-query";
+import type { AppRouter } from "../../../server/routers";
+
+export const trpc = createTRPCReact<AppRouter>();

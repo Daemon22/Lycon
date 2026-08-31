@@ -1,4 +1,6 @@
 // Design system: Quiet Field Instrument — the sidebar owns state and library information; the hero stays focused on browsing, voice input, and deliberate handoff.
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 import { startLogin } from "@/const";
 import { syncIndicatorKind } from "@/lib/syncStatus";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
@@ -222,11 +224,7 @@ function createDestination(value: string): PageRecord {
 }
 
 export default function Home() {
-  const user = null;
-  const loading = false;
-  const error = null;
-  const isAuthenticated = false;
-  const logout = async () => undefined;
+  const { user, loading, error, isAuthenticated, logout } = useAuth();
 
   const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
   const [voskPack, setVoskPack] = usePersistedState<VoskPackState>("lycon-vosk-pack", { status: "not-installed", name: "English (US) · small", size: "40 MB" });
@@ -248,6 +246,10 @@ export default function Home() {
   const [splitViewOpen, setSplitViewOpen] = useState(false);
   const [syncRevision, setSyncRevision] = usePersistedState<number>("lycon-sync-revision", 0);
   const [syncStatus, setSyncStatus] = useState("Sync is off");
+  const syncQuery = trpc.library.get.useQuery(undefined, { enabled: isAuthenticated && settings.syncEnabled === true, retry: false });
+  const syncPut = trpc.library.put.useMutation();
+  const syncHydratedRef = useRef(false);
+  const lastSyncedPayloadRef = useRef("");
   const [draggingTabId, setDraggingTabId] = useState<number | null>(null);
   const [pressingTabId, setPressingTabId] = useState<number | null>(null);
   const tabPointerRef = useRef<{ id: number; moved: boolean; touch: boolean } | null>(null);
@@ -269,8 +271,74 @@ export default function Home() {
   }, [settings.theme]);
 
   useEffect(() => {
-    setSyncStatus(settings.syncEnabled ? "Local snapshot ready" : "Sync is off");
-  }, [settings.syncEnabled]);
+    if (!settings.syncEnabled) {
+      syncHydratedRef.current = false;
+      setSyncStatus("Sync is off");
+      return;
+    }
+    if (!isAuthenticated) {
+      syncHydratedRef.current = false;
+      setSyncStatus("Sign in to enable account sync");
+      return;
+    }
+    if (syncQuery.isLoading) {
+      setSyncStatus("Checking account sync…");
+      return;
+    }
+    if (syncQuery.error) {
+      setSyncStatus("Sync unavailable; local data remains active");
+      return;
+    }
+    if (syncHydratedRef.current || !syncQuery.data) return;
+    if (syncQuery.data.payload) {
+      const remote = parseSyncPayload(syncQuery.data.payload);
+      if (remote) {
+        setBookmarks((current) => mergeById(current, remote.bookmarks));
+        setHistoryEntries((current) => mergeById(current, remote.history).slice(0, 50));
+        setDownloads((current) => mergeById(current, remote.downloads.map((item) => ({ ...item, content: "" }))).slice(0, 100));
+        setTabs((current) => mergeById(current, remote.tabs));
+        setSettings((current) => ({ ...current, ...remote.settings, syncEnabled: true }));
+        setActiveTabId((current) => remote.activeTabId || current);
+      }
+    }
+    setSyncRevision(syncQuery.data.revision);
+    syncHydratedRef.current = true;
+    setSyncStatus("Account snapshot ready");
+  }, [settings.syncEnabled, isAuthenticated, syncQuery.data, syncQuery.error, syncQuery.isLoading]);
+
+  useEffect(() => {
+    if (!settings.syncEnabled || !isAuthenticated || !syncHydratedRef.current) return;
+    const payload: SyncPayload = { version: 1, exportedAt: new Date().toISOString(), bookmarks, history: historyEntries, downloads: compactDownloads(downloads), tabs, activeTabId, settings };
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSyncedPayloadRef.current) return;
+    const timer = window.setTimeout(() => {
+      setSyncStatus("Saving to your account…");
+      syncPut.mutate({ baseRevision: syncRevision, payload: serialized }, {
+        onSuccess: (result) => {
+          if (result.ok) {
+            setSyncRevision(result.revision);
+            lastSyncedPayloadRef.current = serialized;
+            setSyncStatus("Synced just now");
+            return;
+          }
+          const remote = parseSyncPayload(result.conflict.payload);
+          if (remote) {
+            setBookmarks((current) => mergeById(current, remote.bookmarks));
+            setHistoryEntries((current) => mergeById(current, remote.history).slice(0, 50));
+            setDownloads((current) => mergeById(current, remote.downloads.map((item) => ({ ...item, content: "" }))).slice(0, 100));
+            setTabs((current) => mergeById(current, remote.tabs));
+            setSettings((current) => ({ ...current, ...remote.settings, syncEnabled: true }));
+            setActiveTabId((current) => remote.activeTabId || current);
+            setSyncRevision(result.conflict.revision);
+            lastSyncedPayloadRef.current = "";
+            setSyncStatus("Merged newer account snapshot");
+          }
+        },
+        onError: () => setSyncStatus("Sync failed; local data remains active"),
+      });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [settings.syncEnabled, isAuthenticated, bookmarks, historyEntries, downloads, tabs, activeTabId, settings, syncRevision]);
 
   useEffect(() => {
     try { window.localStorage.setItem("lycon-active-tab", JSON.stringify(activeTabId)); } catch { /* storage can be unavailable */ }
@@ -496,7 +564,7 @@ export default function Home() {
   const importLocalData = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; try { const parsed = JSON.parse(await file.text()) as Partial<BackupPayload>; if (parsed.format !== "lycon-local-backup" || parsed.version !== 1) throw new Error("Unsupported backup"); const importedBookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks.filter(isBookmarkItem) : []; const importedHistory = Array.isArray(parsed.history) ? parsed.history.filter(isHistoryItem) : []; const importedDownloads = Array.isArray(parsed.downloads) ? parsed.downloads.filter(isDownloadItem) : []; setBookmarks((previous) => mergeById(previous, importedBookmarks)); setHistoryEntries((previous) => mergeById(previous, importedHistory).slice(0, 50)); setDownloads((previous) => mergeById(previous, importedDownloads).slice(0, 100)); showToast(`Imported ${importedBookmarks.length} saved pages and ${importedDownloads.length} documents`); } catch { showToast("That file is not a Lycon local backup"); } };
 
   return (
-    <div className={`lycon-app mode-${shellState}`} style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
+    <div className={`lycon-app mode-${shellState} view-${currentView}`} style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
       <main className="lycon-main">
         <div className="tab-strip">
           <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/manus-storage/lycon-supplied-logo_58eb806e.png" alt="" /></button>
