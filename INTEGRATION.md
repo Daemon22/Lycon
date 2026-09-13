@@ -94,7 +94,7 @@ in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
 1. Add GeckoView to `app/build.gradle.kts`:
    ```kotlin
    dependencies {
-       implementation("org.mozilla.geckoview:geckoview:124.0.20240304043214")
+       implementation("org.mozilla.geckoview:geckoview:124.0.20240311145044")
    }
    ```
 2. Add Mozilla's Maven repo to `settings.gradle.kts`:

@@ -64,10 +64,15 @@ Instead, we use the standard **prompt-delegate bridge pattern**:
    (a JSON string). Otherwise, dismisses the prompt.
 
 3. **Events** (native → JS):
-   `bridge.sendEvent(event, payload)` calls
-   `session.evaluateJavaScript("window.__lyconBridge.onEvent(event, payload)")`.
-   The init script sets up `window.__lyconBridge.onEvent` which forwards to
-   subscribers registered via `__lyconNative.on(event, cb)`.
+   `bridge.sendEvent(event, payload)` is intended to push events to JS by calling
+   `session.evaluateJavaScript("window.__lyconBridge.onEvent(event, payload)")`,
+   forwarding to subscribers registered via `__lyconNative.on(event, cb)`.
+
+   ⚠️ **GV124 note:** `GeckoSession.evaluateJavaScript` is absent in GV124 — see
+   `dl117.log` (`class not found` / empty method probe results). Native→JS event
+   pushes are therefore **currently deferred**. The JS→native **prompt** bridge
+   still works (the prompt delegate / `TextPrompt` path in `MainActivity.kt`),
+   so request/response calls remain functional.
 
 ## Ad blocker (Lycon Shields)
 
@@ -83,9 +88,17 @@ Firefox Focus and Firefox for Android's strict ETP mode. Configured in
 - **Fingerprinting** scripts
 - **SafeBrowsing** (malware + unwanted + harmful)
 
-The `ContentBlockingController.EventDelegate` fires `onContentBlocked`
-whenever a request is rejected, which increments the counter and emits a
-`shields:blocked` event to JS.
+The `ContentBlocking.Delegate` fires `onContentBlocked` (delivered as a
+`ContentBlocking.BlockEvent`) whenever a request is rejected, which increments
+the counter and emits a `shields:blocked` event to JS.
+
+> ⚠️ **GV124 migration note:** the API moved from
+> `ContentBlockingController` / `EventDelegate` (GV117) to
+> `ContentBlocking` / `Delegate` (GV124) — see `dl117.log` for the
+> `class not found: org.mozilla.geckoview.ContentBlockingController$EventDelegate`
+> error that drove the change. The prompt delegate types moved in lockstep:
+> `PromptPrompt` → `TextPrompt` (i.e. `onTextPrompt`); native→JS event pushes are
+> deferred (see below).
 
 ## HTTPS-Only mode
 
@@ -127,7 +140,9 @@ with your keystore.
 
 ## GeckoView version notes
 
-The dependency is pinned to `124.0.20240304043214`. To upgrade:
+The dependency is pinned to `124.0.20240311145044` (the closest published
+124.0 release to the originally-documented `124.0.20240304043214`, which was
+never published to the Mozilla Maven repo). To upgrade:
 
 1. Check https://maven.mozilla.org/?prefix=maven2/org/mozilla/geckoview/
    for the latest stable release.

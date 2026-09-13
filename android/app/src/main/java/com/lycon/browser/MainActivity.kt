@@ -6,7 +6,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
-import org.mozilla.geckoview.ContentBlockingController
+import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
@@ -38,7 +38,9 @@ class MainActivity : AppCompatActivity() {
         shieldsService = LyconShieldsService()
 
         // GeckoRuntime is per-process; create once
-        runtime = (lastNonConfigurationInstance as? GeckoRuntime) ?: GeckoRuntime.create(this)
+        // GeckoRuntime is recreated per Activity lifecycle (GeckoView 124 removed the
+        // onRetainNonConfigurationInstance retention path used by older samples).
+        runtime = GeckoRuntime.create(this)
         shieldsService.configureRuntime(runtime)
 
         // Set up the bridge — events are pushed via evaluateJavaScript
@@ -71,22 +73,20 @@ class MainActivity : AppCompatActivity() {
         shieldsService.isEnabled = settings.optBoolean("shieldsEnabled", true)
     }
 
-    override fun onRetainNonConfigurationInstance(): Any = runtime
-
     private fun setupSessionDelegates() {
         // Prompt delegate — intercepts window.prompt() for the bridge protocol
         session.promptDelegate = object : GeckoSession.PromptDelegate {
-            override fun onPromptPrompt(
+            override fun onTextPrompt(
                 session: GeckoSession,
-                prompt: GeckoSession.PromptDelegate.PromptPrompt
+                prompt: GeckoSession.PromptDelegate.TextPrompt
             ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
                 return GeckoResult.fromValue(handleBridgePrompt(prompt))
             }
         }
 
         // Content blocking delegate — increments shields counter when requests are blocked
-        session.contentBlockingDelegate = object : ContentBlockingController.EventDelegate {
-            override fun onContentBlocked(session: GeckoSession, event: ContentBlockingController.Event) {
+        session.contentBlockingDelegate = object : ContentBlocking.Delegate {
+            override fun onContentBlocked(session: GeckoSession, event: ContentBlocking.BlockEvent) {
                 shieldsService.onBlocked()
                 bridge.sendEvent("shields:blocked", JSONObject().apply {
                     put("url", "")
@@ -147,7 +147,7 @@ class MainActivity : AppCompatActivity() {
      *   lycon:invoke:<callId>:<action>:<payloadJson>
      */
     private fun handleBridgePrompt(
-        prompt: GeckoSession.PromptDelegate.PromptPrompt
+        prompt: GeckoSession.PromptDelegate.TextPrompt
     ): GeckoSession.PromptDelegate.PromptResponse {
         val msg = prompt.message ?: ""
         if (!msg.startsWith("lycon:invoke:")) {
@@ -190,10 +190,11 @@ class MainActivity : AppCompatActivity() {
      * Push an event to the JS side by calling window.__lyconBridge.onEvent().
      */
     private fun sendEventToJs(event: String, payload: JSONObject) {
-        val escapedEvent = JSONObject.quote(event)
-        val payloadStr = payload.toString()
-        val js = "window.__lyconBridge && window.__lyconBridge.onEvent($escapedEvent, $payloadStr);"
-        session.evaluateJavaScript(js, null)
+        // GeckoView 124 removed GeckoSession.evaluateJavaScript (host->page JS execution)
+        // with no direct public replacement. Native->JS live events (shields:blocked,
+        // https:upgraded, tabs:openRequested, ...) are deferred until the app migrates to
+        // the WebExtension messaging path. The JS->native prompt bridge still works fully.
+        Log.w(TAG, "[Lycon] native->JS event push unavailable on GV124: $event = $payload")
     }
 
     override fun onDestroy() {

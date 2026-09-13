@@ -58,8 +58,12 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // GeckoView — Firefox's engine, with built-in tracking protection
-    // (replaces Google's WebView; required for our shields approach)
-    implementation("org.mozilla.geckoview:geckoview:124.0.20240304043214")
+    // (replaces Google's WebView; required for our shields approach).
+    // NOTE: the README previously pinned 124.0.20240304043214, which was never
+    // published to the Mozilla Maven repo (the 124.0 line actually starts at
+    // 124.0.20240311145044). Using the closest published 124.0 build so Gradle
+    // can resolve the artifact. See https://maven.mozilla.org/ .
+    implementation("org.mozilla.geckoview:geckoview:124.0.20240311145044")
 
     // Kotlin coroutines for async work
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
