@@ -25,6 +25,12 @@ importers:
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.64.0(react@19.2.1))
+      '@manya-hael/toolkit':
+        specifier: 0.2.0
+        version: 0.2.0
+      '@manya-os/nervous-system':
+        specifier: 1.1.0
+        version: 1.1.0
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.1(@types/react@19.2.1))(@types/react@19.2.1)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -1126,6 +1132,12 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@manya-hael/toolkit@0.2.0':
+    resolution: {integrity: sha512-ogsT33VUSa60BUCaqg9naVFZi+Ki10RoixNUq8LHEbB7pXmI8L8IKXiYNbNL9zZTMzOPt8Hco99kTCTX8jwT+A==}
+
+  '@manya-os/nervous-system@1.1.0':
+    resolution: {integrity: sha512-vdE01vT5Iwt/xuaRFn6vS7pOZTuJryt3ZKggA1HDmhBwNjp0ENV0v6hr5GWQCw+wwE+1JMAFlX9D53CD5malQQ==}
 
   '@medv/finder@4.0.2':
     resolution: {integrity: sha512-RraNY9SCcx4KZV0Dh6BEW6XEW2swkqYca74pkFFRw6hHItSHiy+O/xMnpbofjYbzXj0tSpBGthUF1hHTsr3vIQ==}
@@ -5008,6 +5020,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@manya-hael/toolkit@0.2.0': {}
+
+  '@manya-os/nervous-system@1.1.0': {}
 
   '@medv/finder@4.0.2': {}
 

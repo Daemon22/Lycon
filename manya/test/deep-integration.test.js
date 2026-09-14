@@ -11,8 +11,8 @@ import {
   createPrivateSessionFactory,
 } from '../deep-integration.js';
 import { createAdapter, createShieldBlockedEvent } from '../index.js';
-import { createBus, subscribe } from '@manya/unify';
-import { createIOC, classifyThreat } from '../../../cybersecurity/src/threats.js';
+import { createBus, subscribe } from '../event-bus.js';
+import { createIOC, classifyThreat } from './fixtures/cybersecurity.js';
 
 // Mock cybersecurity API
 const mockCyberApi = {
