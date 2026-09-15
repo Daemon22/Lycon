@@ -19,23 +19,28 @@ import kotlinx.coroutines.runBlocking
  *                  of the form: lycon:invoke:<callId>:<action>:<payloadJson>
  *                  (Using prompt() is the standard GeckoView bridge pattern.)
  *
- *   Native -> JS:  GeckoSession.evaluateJavaScript("window.__lyconBridge.onResponse(...)")
- *                  and "window.__lyconBridge.onEvent(...)"
+ *   Native -> JS:  GeckoView 124 dropped GeckoSession.evaluateJavaScript, so the
+ *                  shell's bridge (bridge.js) polls a native queue instead:
+ *                  the JS side calls shell:collectEvents every ~800ms and this
+ *                  class drains pending native->JS events into its response.
  *
- * The bridge script (injected by MainActivity) creates window.__lyconNative
- * which calls window.prompt() with the encoded message.
+ * The bundle self-bootstraps window.__lyconNative when the host cannot inject
+ * one before page scripts run (see src/bridge/bridge.js). It speaks this same
+ * prompt protocol, providing window.__lyconNative.invoke/on directly.
  */
 class LyconBridge(
     private val context: Context,
     private val dataService: LyconDataService,
     private val shieldsService: LyconShieldsService,
-    private val onEventSender: (String, JSONObject) -> Unit,
     private val onWindowClose: () -> Unit,
     private val onWindowMinimize: () -> Unit,
     private val onWindowMaximize: () -> Unit,
 ) {
 
     private val agents = LyconAgentService(context)
+
+    /** Pending native->JS events, drained by the shell's shell:collectEvents poll. */
+    private val eventQueue = java.util.concurrent.ConcurrentLinkedQueue<JSONObject>()
 
     private val handlers: Map<String, (JSONObject?) -> Any> = mapOf(
         "settings:get" to { _ -> dataService.loadSettings() },
@@ -116,6 +121,15 @@ class LyconBridge(
             }
             true
         },
+        "shell:collectEvents" to { _ ->
+            val drained = JSONArray()
+            var ev = eventQueue.poll()
+            while (ev != null) {
+                drained.put(ev)
+                ev = eventQueue.poll()
+            }
+            drained
+        },
     )
 
     /**
@@ -131,6 +145,9 @@ class LyconBridge(
             throw e
         }
     }
+
+    /** Known bridge action names (actions contain ':' themselves, e.g. settings:get). */
+    fun actions(): Set<String> = handlers.keys
 
     /**
      * JS-side bridge source — creates window.__lyconNative via window.prompt()
@@ -201,10 +218,14 @@ class LyconBridge(
 """.trimIndent()
 
     /**
-     * Push an event to the JS side via evaluateJavaScript.
+     * Queue a native->JS event; the shell drains it via shell:collectEvents.
+     * (GeckoView 124 removed host->page JS execution, so no evaluateJavaScript.)
      */
     fun sendEvent(event: String, payload: JSONObject) {
-        onEventSender(event, payload)
+        eventQueue.add(JSONObject().apply {
+            put("event", event)
+            put("payload", payload)
+        })
     }
 
     companion object {

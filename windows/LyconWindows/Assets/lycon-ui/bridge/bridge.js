@@ -25,15 +25,90 @@
 (function () {
   'use strict';
 
-  const native = window.__lyconNative;
-  if (!native) {
-    console.error('[Lycon] FATAL: window.__lyconNative not found. Bridge missing.');
-    // Provide a no-op stub so the UI doesn't crash on load — every call rejects.
-    window.lycon = new Proxy({}, {
-      get: () => () => Promise.reject(new Error('No native bridge')),
-    });
-    return;
+  // ---- Embedded-native fallback --------------------------------------------
+  // Watching hosts (WinUI WebView2, Electron) inject window.__lyconNative before
+  // this script runs. Android's GeckoView 124 has no script-before-navigation
+  // API, so when the host cannot inject, Lycon bootstraps a prompt-RPC adapter
+  // itself. It speaks the exact protocol implemented by PromptDelegate in
+  // LyconBridge.kt (android/):
+  //     window.prompt('lycon:invoke:<callId>:<action>:<payloadJson>')
+  // returns a JSON text { result, error } synchronously.
+  function bootstrapNative() {
+    if (window.__lyconNative) return window.__lyconNative;
+
+    const pending = new Map();
+    let nextCallId = 1;
+
+    function callNative(action, payload) {
+      return new Promise((resolve, reject) => {
+        const callId = nextCallId++;
+        pending.set(callId, { resolve, reject });
+        const msg = 'lycon:invoke:' + callId + ':' + action + ':' +
+          (payload === undefined || payload === null ? 'null' : JSON.stringify(payload));
+        try {
+          const response = window.prompt(msg);
+          if (response === null || typeof response === 'undefined') {
+            pending.delete(callId);
+            reject(new Error('Native returned null'));
+            return;
+          }
+          const parsed = JSON.parse(response);
+          pending.delete(callId);
+          if (parsed.error) reject(new Error(parsed.error));
+          else resolve(parsed.result);
+        } catch (e) {
+          pending.delete(callId);
+          reject(e);
+        }
+      });
+    }
+
+    const listeners = new Map();
+
+    function emit(event, payload) {
+      const set = listeners.get(event);
+      if (!set) return;
+      for (const cb of Array.from(set)) {
+        try { cb(payload); } catch (e) { console.error('[Lycon] listener error', e); }
+      }
+    }
+
+    const ua = (navigator.userAgent || '').toLowerCase();
+    const platform = ua.indexOf('gecko') !== -1 ? 'geckoview'
+      : ua.indexOf('electron') !== -1 ? 'electron'
+      : ua.indexOf('android') !== -1 ? 'android'
+      : 'web';
+
+    const native = {
+      invoke: callNative,
+      on: function (event, cb) {
+        if (!listeners.has(event)) listeners.set(event, new Set());
+        listeners.get(event).add(cb);
+        return function () { const s = listeners.get(event); if (s) s.delete(cb); };
+      },
+      platform,
+      versions: { engine: 'prompt-rpc', geckoview: '124.0', os: 'Android' },
+      initialUrl: null,
+    };
+
+    // GeckoView 124 dropped host->page JS execution, so native events are
+    // delivered by polling a queue native fills (see shell:collectEvents in
+    // LyconBridge.kt). Hosts that push events out-of-band are unaffected.
+    setInterval(function () {
+      callNative('shell:collectEvents', null).then(function (batch) {
+        if (!Array.isArray(batch)) return;
+        for (const ev of batch) {
+          if (ev && ev.event) emit(ev.event, ev.payload);
+        }
+      }).catch(function () {});
+    }, 800);
+
+    window.__lyconNative = native;
+    console.log('[Lycon] embedded prompt-RPC bridge bootstrapped');
+    return native;
   }
+
+  const native = bootstrapNative();
 
   if (typeof native.invoke !== 'function') {
     console.error('[Lycon] FATAL: __lyconNative.invoke is not a function');

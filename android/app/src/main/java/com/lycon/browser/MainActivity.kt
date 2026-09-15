@@ -43,12 +43,11 @@ class MainActivity : AppCompatActivity() {
         runtime = GeckoRuntime.create(this)
         shieldsService.configureRuntime(runtime)
 
-        // Set up the bridge — events are pushed via evaluateJavaScript
+        // Set up the bridge — events are queued and drained by the shell
         bridge = LyconBridge(
             context = this,
             dataService = dataService,
             shieldsService = shieldsService,
-            onEventSender = { event, payload -> sendEventToJs(event, payload) },
             onWindowClose = { finish() },
             onWindowMinimize = { /* Android: not applicable for an Activity */ },
             onWindowMaximize = { /* Android: full-screen toggle would go here */ },
@@ -58,8 +57,9 @@ class MainActivity : AppCompatActivity() {
         session.settings.userAgentOverride = "Mozilla/5.0 (Linux; Android 14) Gecko/124.0 Lycon/1.0"
         session.open(runtime)
 
-        // Inject the bridge script before any page scripts run
-        session.loadUri("about:blank")
+        // Note: the shared bundle self-bootstraps window.__lyconNative via the
+        // prompt-RPC protocol (src/bridge/bridge.js) — GeckoView 124 has no
+        // script-before-navigation injection API, so no injection is needed here.
 
         // Set up delegates
         setupSessionDelegates()
@@ -155,11 +155,29 @@ class MainActivity : AppCompatActivity() {
             return prompt.dismiss()
         }
         try {
-            val parts = msg.split(":", limit = 4)
-            if (parts.size != 4) return prompt.dismiss()
-            val callId = parts[2]
-            val action = parts[3].substringBefore(":")
-            val payloadStr = parts[3].substringAfter(":", "")
+            val body = msg.removePrefix("lycon:invoke:")
+            val colon1 = body.indexOf(':')
+            if (colon1 <= 0) return prompt.dismiss()
+            val rest = body.substring(colon1 + 1)
+
+            // Action names contain ':' themselves (settings:get, shell:collectEvents)
+            // and payloads may contain ':' too, so resolve the action against the
+            // known handler vocabulary instead of blind colon-splitting.
+            var action: String? = null
+            var payloadStr = ""
+            for (key in bridge.actions()) {
+                if (rest == key) {
+                    action = key
+                    payloadStr = ""
+                    break
+                }
+                if (rest.startsWith("$key:")) {
+                    action = key
+                    payloadStr = rest.substring(key.length + 1)
+                    break
+                }
+            }
+            if (action == null) return prompt.dismiss()
             val payload = if (payloadStr.isNotEmpty() && payloadStr != "null") {
                 JSONObject(payloadStr)
             } else null
@@ -184,17 +202,6 @@ class MainActivity : AppCompatActivity() {
         // Load the shared Lycon UI from assets/lycon-ui/index.html
         // GeckoView can load asset:// URLs
         session.loadUri("resource://android/assets/lycon-ui/index.html")
-    }
-
-    /**
-     * Push an event to the JS side by calling window.__lyconBridge.onEvent().
-     */
-    private fun sendEventToJs(event: String, payload: JSONObject) {
-        // GeckoView 124 removed GeckoSession.evaluateJavaScript (host->page JS execution)
-        // with no direct public replacement. Native->JS live events (shields:blocked,
-        // https:upgraded, tabs:openRequested, ...) are deferred until the app migrates to
-        // the WebExtension messaging path. The JS->native prompt bridge still works fully.
-        Log.w(TAG, "[Lycon] native->JS event push unavailable on GV124: $event = $payload")
     }
 
     override fun onDestroy() {

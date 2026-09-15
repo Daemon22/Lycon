@@ -24,6 +24,17 @@ android {
         }
     }
 
+    // Per-ABI splits: keeps install sizes small on the device (GeckoView is huge),
+    // while still producing a full universal APK for stores.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     // GeckoView ships native libs for arm64-v8a, armeabi-v7a, x86_64
     ndkVersion = "26.1.10909125"
 

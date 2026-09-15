@@ -130,9 +130,23 @@
     el.replaceWith(buildTabEl(t));
   }
 
-  // ---------------- Webview management ----------------
+  // ---------------- Content view management ----------------
+  // Electron hosts support the <webview> element. Embedded hosts (Android
+  // GeckoView, WinUI WebView2, plain web) do not, so Lycon falls back to an
+  // <iframe>-backed facade exposing the same surface the shell already uses
+  // (loadURL / reload / canGoBack / ...). Tab chrome and bookkeeping stay
+  // identical across hosts.
+  function isElectronHost() {
+    return !!(window.lycon && window.lycon.platform === 'electron');
+  }
+
   function ensureWebview(t, initialUrl) {
     if (t.webview) return t.webview;
+    if (isElectronHost()) return ensureElectronWebview(t, initialUrl);
+    return ensureFrameView(t, initialUrl);
+  }
+
+  function ensureElectronWebview(t, initialUrl) {
     const wv = document.createElement('webview');
     wv.dataset.id = t.id;
     wv.setAttribute('autoplay-policy', 'document-user-activation-required');
@@ -151,6 +165,93 @@
     t.domReady = false;
     wireWebview(t);
     return wv;
+  }
+
+  function ensureFrameView(t, initialUrl) {
+    const fr = document.createElement('iframe');
+    fr.dataset.id = t.id;
+    fr.className = 'lycon-content-frame hidden';
+    fr.setAttribute('allow', 'autoplay; clipboard-write; encrypted-media; fullscreen; geolocation; microphone; camera;');
+    contentEl.appendChild(fr);
+    t.domReady = true;
+    t.frame = fr;
+    t.webview = createFrameFacade(t, fr);
+    if (initialUrl) {
+      fr.src = initialUrl;
+      updateTab(t.id, { loading: true, url: initialUrl });
+    }
+    return t.webview;
+  }
+
+  function isInternalUrl(u) {
+    return /startpage\.html/.test(u) || /^(about:|data:|lycon-startpage:)/.test(u);
+  }
+
+  // Minimal Electron-webview-compatible surface so the whole shell (tabs/nav/
+  // finder/shields/menu/agents) works unchanged on iframe-backed hosts.
+  function createFrameFacade(t, fr) {
+    function navigate(u) {
+      if (!u) return;
+      updateTab(t.id, { loading: true, url: u });
+      pushTabHistory(t, u);
+      fr.src = u;
+      window.LyconNav && window.LyconNav.refreshNav();
+    }
+    const facade = {
+      loadURL: function (u) {
+        navigate(u);
+        try { if (fr.contentWindow && fr.contentWindow.focus) fr.contentWindow.focus(); } catch (e) {}
+        return Promise.resolve();
+      },
+      reload: function () { const cur = fr.getAttribute('src'); if (cur) fr.src = cur; },
+      reloadIgnoringCache: function () { this.reload(); },
+      canGoBack: function () { return t.historyIdx > 0; },
+      goBack: function () { if (this.canGoBack()) { t.historyIdx--; navigate(t.history[t.historyIdx]); } },
+      canGoForward: function () { return t.historyIdx < (t.history || []).length - 1; },
+      goForward: function () { if (this.canGoForward()) { t.historyIdx++; navigate(t.history[t.historyIdx]); } },
+      getURL: function () { return t.url || ''; },
+      getTitle: function () { return t.title || ''; },
+      setAudioMuted: function () {},
+      isDevToolsOpened: function () { return false; },
+      openDevTools: function () {},
+      closeDevTools: function () {},
+      findInPage: function () { return 0; },
+      stopFindInPage: function () {},
+      getWebContentsId: function () { return -1; },
+      executeJavaScript: function () { return Promise.resolve(null); },
+      capturePage: function () { return Promise.resolve(screenshotPlaceholder(t)); },
+      addEventListener: function () {},
+      removeEventListener: function () {},
+      remove: function () { fr.remove(); t.frame = null; },
+    };
+    Object.defineProperty(facade, 'classList', { get: function () { return fr.classList; } });
+    Object.defineProperty(facade, 'dataset', { get: function () { return fr.dataset; } });
+
+    fr.addEventListener('load', function () {
+      updateTab(t.id, { loading: false });
+      let title = '';
+      try { if (fr.contentDocument && fr.contentDocument.title) title = fr.contentDocument.title; } catch (e) {}
+      if (title) updateTab(t.id, { title });
+      const url = t.url || fr.getAttribute('src') || '';
+      if (window.LyconHistory && !t.private && !isInternalUrl(url)) {
+        window.LyconHistory.add({ url, title: title || url, visitedAt: Date.now() });
+      }
+      window.LyconNav && window.LyconNav.refreshNav();
+    });
+
+    return facade;
+  }
+
+  function screenshotPlaceholder(t) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800; canvas.height = 500;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = getComputedStyle(document.body).backgroundColor || '#17120f';
+    ctx.fillRect(0, 0, 800, 500);
+    ctx.fillStyle = '#d4a574';
+    ctx.font = '600 32px system-ui, sans-serif';
+    ctx.fillText('Lycon — ' + (t.title || 'New Tab'), 32, 250);
+    return canvas;
   }
 
   function wireWebview(t) {

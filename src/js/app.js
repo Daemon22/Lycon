@@ -118,29 +118,42 @@
 
   // ---------- Init ----------
   async function init() {
-    // Load settings + search engines
+    // Load settings + search engines (each subsystem is isolated so a single
+    // failure can never abort tab creation / boot)
     if (window.lycon) {
-      const s = await window.lycon.settings.get();
-      Object.assign(state.settings, s);
-      state.searchEngines = await window.lycon.search.list();
+      try {
+        const s = await window.lycon.settings.get();
+        Object.assign(state.settings, s);
+      } catch (e) {
+        console.warn('[Lycon] settings load failed', e);
+      }
+      try {
+        state.searchEngines = await window.lycon.search.list();
+      } catch (e) {
+        console.warn('[Lycon] search engines load failed', e);
+      }
     }
 
     // Apply theme
     if (window.LyconSettings) window.LyconSettings.applyTheme();
 
     // Load bookmarks/history/downloads in background
-    if (window.LyconBookmarks) await window.LyconBookmarks.refresh();
-    if (window.LyconHistory)   await window.LyconHistory.refresh();
-    if (window.LyconDownloads) await window.LyconDownloads.refresh();
+    try { if (window.LyconBookmarks) await window.LyconBookmarks.refresh(); } catch (e) { console.warn('[Lycon] bookmarks refresh failed', e); }
+    try { if (window.LyconHistory)   await window.LyconHistory.refresh(); }   catch (e) { console.warn('[Lycon] history refresh failed', e); }
+    try { if (window.LyconDownloads) await window.LyconDownloads.refresh(); } catch (e) { console.warn('[Lycon] downloads refresh failed', e); }
 
     // Create the first tab (start page or initial URL from env / args)
-    if (window.LyconTabs) {
-      const initialUrl = window.lycon && window.lycon.initialUrl;
-      if (initialUrl) {
-        window.LyconTabs.createTab({ url: initialUrl, private: state.settings.privateTabDefault });
-      } else {
-        window.LyconTabs.createTab({ private: state.settings.privateTabDefault });
+    try {
+      if (window.LyconTabs) {
+        const initialUrl = window.lycon && window.lycon.initialUrl;
+        if (initialUrl) {
+          window.LyconTabs.createTab({ url: initialUrl, private: state.settings.privateTabDefault });
+        } else {
+          window.LyconTabs.createTab({ private: state.settings.privateTabDefault });
+        }
       }
+    } catch (e) {
+      console.error('[Lycon] initial tab creation failed', e);
     }
 
     // Focus URL bar after a moment
