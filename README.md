@@ -4,261 +4,263 @@
 
 A privacy-first web browser with a fierce wolf mascot.
 
-Lycon is built as a **modern full-stack application**: a React + tRPC + Vite
-frontend (`client/`) served by a TypeScript backend (`server/`), packaged as a
-native **Tauri** desktop app (`src-tauri/`) — with a standalone **Web** build
-(`web/`) and a legacy native-shell lineage (WinUI 3 + WebView2, and Kotlin +
-GeckoView) that host the original shared `src/` UI bundle.
+Lycon is a **single application** that runs identically on Windows (Tauri),
+Android (GeckoView), and the web. The frontend is a React + Vite bundle built
+once from `client/` and deployed to every platform. There are no legacy shells,
+no separate per-platform UI, and no version drift.
 
-The classic **Electron** shell is **deprecated** in favor of Tauri.
+See [SINGLE_SOURCE.md](SINGLE_SOURCE.md) for the single-source-of-truth policy.
 
 > ⚠️ This is currently a private repository.
 
-![Lycon](src/assets/wolf-logo.png)
+![Lycon Browser](client/public/assets/lycon-logo.png)
 
 ## Architecture
 
 ```
-   MODERN STACK (primary)
-   ┌─────────────────────────────┐
-   │  Frontend: client/            │
-   │  React • Vite • tailwind     │
-   │  tRPC API consumers          │
-   └──────────────┬──────────────┘
-                  │ tRPC / REST
-   ┌──────────────┴──────────────┐
-   │  Backend: server/            │
-   │  tRPC routers • Express     │
-   │  TypeScript (tsx)            │
-   └──────────────┬──────────────┘
-                  │
-        ┌─────────┴──────────┐
-        │                    │
-   ┌────▼──────────┐  ┌─────▼──────────┐
-   │ Tauri desktop │  │ Web (web/)     │
-   │ src-tauri/    │  │ standalone     │
-   │ Rust shell    │  │ Vite build     │
-   │ (MSI/NSIS)    │  │ web/dist/      │
-   └───────────────┘  └────────────────┘
-
-   LEGACY SHELLS (host the shared src/ bundle via the bridge contract)
-   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-   │ WinUI 3      │  │ Kotlin +     │  │ Electron      │
-   │ + WebView2   │  │ GeckoView    │  │  (DEPRECATED) │
-   │ windows/     │  │ android/     │  │ main.cjs      │
-   └──────┬───────┘  └──────┬───────┘  └────────────────┘
-          │                 │
-          └──────┬──────────┘
-                 │
-   ┌─────────────▼──────────────┐
-   │  Shared UI bundle: src/    │
-   │  HTML/CSS/Vanilla JS       │
-   │  talks to window.__lycon   │
-   │  (BRIDGE_CONTRACT.md)      │
-   └────────────────────────────┘
+                         ┌──────────────────┐
+                         │  client/          │
+                         │  React • Vite     │  ← the ONLY frontend
+                         │  TypeScript       │
+                         └───────┬───────────┘
+                                 │ tRPC / REST
+                  ┌──────────────┴──────────────┐
+                  │                             │
+         ┌────────▼────────┐         ┌─────────▼────────┐
+         │  server/        │         │  shared/          │
+         │  tRPC • Express │         │  shared types     │
+         │  Drizzle ORM    │         │  constants        │
+         └────────┬────────┘         └─────────┬────────┘
+                  │                             │
+        pnpm run build (Vite)                   │
+                  │                             │
+                  ▼                             │
+         ┌────────┴────────┐                    │
+         │ dist/public/     │                    │
+         │  (static bundle)│                    │
+         └────────┬────────┘                    │
+                  │                              │
+    ┌─────────────┼─────────────┐              │
+    │             │             │              │
+    ▼             ▼             ▼              │
+ ┌──────┐   ┌─────────┐  ┌──────────┐        │
+ │Tauri │   │Android  │  │Web       │◀───────┘
+ │desktop│   │GeckoView│  │(vite    │
+ │src-   │   │  loads  │  │ preview │
+ │tauri/  │   │  the    │  │  or    │
+ │        │  │  same   │  │  nginx) │
+ │        │  │  bundle │  │        │
+ └──────┘   └─────────┘  └──────────┘
 ```
 
-The modern Tauri/Web UI lives in `client/` (+ `web/client/`) and talks to the
-backend via tRPC. The legacy shells (Windows, Android) host an older, framework-
-free UI bundle in `src/` and use the single `window.__lyconNative` bridge so the
-exact same UI runs unchanged on each platform.
+**One frontend. One build. One version.**
+
+- The **canonical frontend** lives in `client/` (React 19 + Vite + Tailwind).
+- `pnpm run build` compiles it → `dist/public/` (static HTML/JS/CSS).
+- **Tauri** serves `dist/public/` directly for Windows, macOS, and Linux.
+- **Android** copies `dist/public/` into `android/app/src/main/assets/lycon-ui/`
+  via `sync-ui-bundle.sh`; GeckoView loads it at runtime.
+- **Web** can be served from `dist/public/` by any static file server.
+
+The native layer on each platform provides capabilities the React frontend
+cannot implement alone:
+
+| Capability | Desktop (Tauri) | Android (GeckoView) |
+|---|---|---|
+| Content blocking (shields) | WebView-level | Built-in TP lists |
+| HTTPS-Only mode | Navigation delegate | Navigation delegate |
+| System downloads | Native file picker | Download manager |
+| Local file access | File system API | File input fallback |
 
 ## Status
 
-| Platform | Build target | Status | Tests |
-|---|---|---|---|
-| **Tauri (desktop)** | `pnpm desktop:build` | ✅ Primary desktop, builds MSI + NSIS | `pnpm test` (vitest) |
-| **Web** | `cd web && pnpm build` | ✅ Standalone build → `web/dist/` | `pnpm test` (vitest) |
-| Android (Kotlin + GeckoView) | `./gradlew :app:assembleDebug` | ✅ Reference project | Manual build |
-| Windows (WinUI 3 + WebView2) | `dotnet build` | ⏳ Reference project — working tree uses the custom `-lycon` projection packages; blocked by a `WebView2` type collision (CS0433) between `Microsoft.UI.Xaml 2.8.7-lycon` and `Microsoft.WindowsAppSDK 1.5.240227000-lycon` | Manual build |
-| ~~Electron~~ | — | ⛔ Deprecated (option B) — `electron` + `@cliqz/adblocker-electron` removed from `package.json` | Legacy `tests/` (38/40) kept as reference |
+| Platform | Build target | Status |
+|---|---|---|
+| **Tauri (desktop)** — Windows, macOS, Linux | `pnpm desktop:build` | ✅ Primary |
+| **Android** — Kotlin + GeckoView | `./gradlew :app:assembleDebug` | ✅ Primary |
+| **Web** | `pnpm build` → `dist/public/` | ✅ Serve anywhere |
+| ~~Electron~~ | — | ⛔ Removed (replaced by Tauri) |
+| ~~WinUI 3 (WPF)~~ | — | ⛔ Removed (replaced by Tauri) |
 
 ## Project structure
 
 ```
 lycon-browser/
-├── package.json               # Modern stack: Tauri + Vite + tRPC dev scripts
-├── pnpm-workspace.yaml        # PNPM workspace (modern stack)
-├── vite.config.ts             # Frontend build: root=client, tRPC beforeDevCommand
-├── vitest.config.ts           # Unit tests: server/ + client/src
-├── todo.md
+├── VERSION                    # Canonical app version (single source of truth)
+├── package.json               # Scripts + dependencies
+├── vite.config.ts             # Frontend build (root=client, output=dist/public)
+├── vitest.config.ts           # Unit tests
+├── .github/workflows/         # CI/CD (Tauri + Android)
+│   ├── tauri-release.yml
+│   └── android-release.yml
+├── sync-ui-bundle.sh          # Build React + sync to Android assets
+├── SINGLE_SOURCE.md           # Single-source-of-truth policy
+├── BRIDGE_CONTRACT.md         # Native bridge API reference
+├── AGENT_ARCHITECTURE.md      # Agent-agnostic design
+├── LYCON_VISION.md            # Product vision
 │
-├── Modern stack
-├── client/                    # React + Vite + Tailwind frontend
-│   └── src/                   # App.tsx → <Home/>, pages/, components/, hooks/
-├── server/                    # tRPC/Express backend (tsx), DB, auth, LLM, etc.
-├── src-tauri/                 # Tauri Rust shell
-│   ├── Cargo.toml             # Tauri 2 (tauri, tauri-plugin-*, wry)
-│   ├── tauri.conf.json
-│   ├── icons/                 # 32..512px + icon.ico
-│   ├── gen/                   # Generated Tauri bridge API
-│   └── target/                # Build artifacts (MSI/NSIS in bundle/)
-├── web/                       # Standalone Web build (own client/server copy)
-│   └── dist/                  # Build output (index.html + JS/CSS)
-├── shared/                    # Empty — alias target for modern imports
-│
-├── Legacy shells (host src/)
-├── src/                       # Shared UI bundle (HTML/CSS/Vanilla JS → window.__lycon)
-│   ├── index.html             # Browser chrome shell
-│   ├── startpage.html         # Wolf-themed new-tab page
-│   ├── bridge/bridge.js       # Wraps __lyconNative → window.lycon
-│   ├── js/, styles/, assets/
-│   └── BRIDGE_CONTRACT.md     # The __lyconNative API contract
-├── windows/                   # WinUI 3 + WebView2 (.NET 8, C#)
-│   ├── LyconWindows.sln
-│   ├── NuGet.Config           # Local -lycon feed + nuget.org
-│   └── LyconWindows/
-│       ├── LyconWindows.csproj
-│       ├── App.xaml/.cs       # WinUI entry
-│       ├── MainWindow.xaml/.cs# WebView2 host + nav/download handlers
-│       ├── LyconBridge.cs     # JS↔native bridge
-│       └── Assets/lycon-ui/   # Copy of src/
-├── android/                   # Kotlin + GeckoView
-│   └── app/src/main/
-│       ├── java/.../MainActivity.kt  # GeckoView host + prompt delegate
-│       ├── LyconBridge.kt
-│       └── assets/lycon-ui/   # Copy of src/
-│
-├── Legacy automation
-├── main.cjs                   # Electron main (deprecated) — full bridge IPC + adblocker
-├── preload.cjs                # Electron preload → __lyconNative
-├── tests/                     # E2E suite (Electron-based), kept as reference
-└── sync-ui-bundle.*           # Sync src/ → platform asset folders
+├── client/                    # ✅ Canonical React + Vite frontend
+│   └── src/
+│       ├── App.tsx            # Entry → <Home />
+│       ├── main.tsx           # React root + tRPC provider
+│       ├── pages/             # Start, Search, Bookmarks, History,
+│       │                     #   Downloads, Settings, Online
+│       ├── components/        # Browser shell, UI components
+│       ├── hooks/             # useAuth, useMobile, usePersistFn
+│       ├── lib/               # trpc, syncStatus, utils, voice
+│       └── index.css
+├── server/                    # ✅ TypeScript backend (tRPC + Express)
+│   └── _core/                 # index, routers, db, oauth, LLM, voice, etc.
+├── shared/                    # ✅ Shared types and constants
+├── src-tauri/                 # ✅ Tauri 2 (Rust) desktop shell
+│   ├── Cargo.toml
+│   ├── tauri.conf.json        # Uses dist/public/ as frontendDist
+│   ├── icons/                 # App icons (32…512px + .ico)
+│   └── src/main.rs
+├── android/                   # ✅ Kotlin + GeckoView mobile shell
+│   ├── app/
+│   │   ├── build.gradle.kts   # Version read from ../../VERSION
+│   │   ├── src/main/
+│   │   │   ├── android/
+│   │   │   │   ├── MainActivity.kt    # GeckoView host + nav delegate
+│   │   │   │   ├── LyconBridge.kt      # Native↔JS bridge
+│   │   │   │   ├── LyconDataService.kt # JSON persistence
+│   │   │   │   ├── LyconShieldsService.kt # Tracking protection
+│   │   │   │   └── LyconAgentService.kt # Intelligence connectors
+│   │   │   ├── assets/lycon-ui/  # React build output (synced)
+│   │   │   └── res/                # Layouts, icons, strings, themes
+│   │   └── proguard-rules.pro
+│   └── README.md
+├── scripts/
+│   └── check-version.cjs      # CI version-consistency checker
+├── tests/                     # Unit + integration tests (vitest)
+├── drizzle/                   # Database schema + migrations
+├── .env                       # Local environment (not committed)
+└── todo.md                    # Development roadmap
 ```
 
 ## Quick start
 
+### Prerequisites
+
+- **Node.js** 22+
+- **pnpm** 10+ (`npm install -g pnpm`)
+- For desktop: **Rust** toolchain + Tauri dependencies
+- For Android: **Android Studio** + SDK 34 + NDK 26.1.10909125
+
+### Install dependencies
+
+```bash
+pnpm install
+```
+
 ### Desktop (Tauri) — primary desktop target
 
 ```bash
-cd lycon-browser
-pnpm install
-pnpm dev                    # starts the tRPC backend on :3000 + Vite HMR
-pnpm desktop:dev            # Tauri dev shell (mirrors the frontend)
-pnpm desktop:build          # -> src-tauri/target/release/bundle/{msi,nsis}
+pnpm dev                    # backend + Vite HMR on http://localhost:3000
+pnpm desktop:dev            # Tauri dev shell
+pnpm desktop:build          # → src-tauri/target/release/bundle/
+```
+
+### Android
+
+```bash
+# 1. Build the React frontend and sync to Android assets
+pnpm run build
+rm -rf android/app/src/main/assets/lycon-ui
+mkdir -p android/app/src/main/assets/lycon-ui
+cp -r dist/public/* android/app/src/main/assets/lycon-ui/
+
+# 2. Build the APK
+cd android
+./gradlew :app:assembleDebug
+# Output: app/build/outputs/apk/debug/app-debug.apk
+```
+
+Or in one step:
+
+```bash
+pnpm run version:sync-ui    # builds React + copies to Android assets
+cd android && ./gradlew :app:assembleDebug
 ```
 
 ### Web
 
 ```bash
-cd lycon-browser/web
-pnpm install
-pnpm build                  # -> web/dist/
-pnpm preview                # serve the static build
+pnpm run build
+npx serve dist/public       # or any static file server
 ```
 
-### Android app
+See [android/README.md](android/README.md) for Android details.
 
-1. Open the `android/` folder in Android Studio (Hedgehog+).
-2. Let Gradle sync (downloads GeckoView, one-time).
-3. Connect a device (API 24+) or start an emulator.
-4. `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`.
+## Version management
 
-See [android/README.md](android/README.md) for details.
+The canonical version lives in the root `VERSION` file. All platform configs
+derive from it:
 
-### Windows native app (legacy)
+```
+VERSION (1.0.0)
+  ├── package.json            → npm version
+  ├── src-tauri/tauri.conf.json → bundle version
+  └── android/app/build.gradle.kts → versionCode + versionName (computed)
+```
 
-1. Open `windows/LyconWindows.sln` in Visual Studio 2022.
-2. The `LyconWindows.csproj` is the SDK-style project that references the custom
-   `-lycon` NuGet feed declared in `windows/LyconWindows/NuGet.Config`.
-3. Build as `x64`.
-
-> Currently blocked by the CS0433 `WebView2` collision described in the Status
-> table above. Until resolved, develop/test the shared UI via the Tauri or Web
-> build, or the legacy Electron shell in `tests/`.
-
-See [windows/README.md](windows/README.md) for details.
-
-### Sync the UI bundle (legacy shells only)
-
-After editing the shared `src/` bundle, push it to the Windows + Android asset
-folders:
+Verify consistency at any time:
 
 ```bash
-./sync-ui-bundle.sh   # or sync-ui-bundle.bat on Windows
+pnpm run version:check
 ```
+
+CI runs this check on every push and pull request.
+
+## Preventing version drift
+
+1. **CI checks** — `version:check` + `test` + `build` run on every PR.
+2. **Single build script** — `sync-ui-bundle.sh` builds `client/` and
+   deploys the identical bundle to Android.
+3. **No hand-edited copies** — Never edit files in `dist/` or
+   `android/app/src/main/assets/lycon-ui/`. Modify `client/` source and rebuild.
+4. **Tag-based releases** — GitHub Actions builds both Tauri and Android
+   from the same git tag, ensuring identical frontends.
 
 ## Features
 
 | Feature | Status |
 |---|---|
-| Multi-tab browsing (drag-reorder / pin / mute / duplicate) | ✅ |
-| Right-click tab context menu | ✅ |
+| Multi-tab browsing (drag-reorder / close / private) | ✅ |
 | Smart URL bar (URLs vs. search queries) | ✅ |
 | Security indicator (🔒 HTTPS / ℹ️ info / ⚠️ HTTP warning) | ✅ |
-| **Lycon Shields** — ad + tracker blocking (per-tab counter) | ✅ |
+| **Lycon Shields** — ad + tracker blocking | ✅ |
 | **HTTPS-Only Mode** (auto-upgrade HTTP→HTTPS) | ✅ |
-| Bookmarks (add/remove/search) | ✅ |
-| History (searchable, clearable) | ✅ |
-| Download manager (live progress) | ✅ |
+| Bookmarks (add/remove/search, JSON export/import) | ✅ |
+| History (searchable, clearable, granular delete) | ✅ |
+| Download manager (live progress, local indexing) | ✅ |
 | Private mode (separate session) | ✅ |
-| Find in page (Ctrl+F) | ✅ |
-| Theme picker (dark/light/system + 3 accents) | ✅ |
-| Local-first browsing (native file picker, file URLs, local paths) | ✅ |
-| Optional intelligence panel (local/remote OpenAI-compatible) | ✅ |
-| Hunting posture indicator (Hardened / Balanced / Permissive) | ✅ |
-| Window state persistence | ✅ |
-| Built-in PDF viewer | ✅ (Tauri + legacy Windows) |
-| DevTools (F12) | ✅ (Tauri) |
+| Find in page | ✅ |
+| Theme picker (dark/light/system + accents) | ✅ |
+| Local file browsing (`file://` URLs, local paths) | ✅ |
+| Voice search (online / on-device / offline Vosk) | ✅ |
+| South African English (en-ZA) offline voice | ✅ |
+| Optional intelligence panel (local/remote AI) | ✅ |
+| Local-first data export/import | ✅ |
+| Sync (opt-in, account-based, conflict-safe) | ✅ |
 
 ## Agent-agnostic intelligence
 
-Lycon is fully usable with **zero intelligence connected**. The optional intelligence panel is an intermediary for user-selected local models, self-hosted endpoints, cloud providers, browser-native services, or future adapters. Lycon does not start a background agent, inspect pages automatically, or silently transmit context.
+Lycon is fully usable with **zero intelligence connected**. The optional
+intelligence panel is an intermediary for user-selected local models,
+self-hosted endpoints, cloud providers, browser-native services, or future
+adapters. Lycon does not start a background agent, inspect pages automatically,
+or silently transmit context.
 
-A connection records its name, local/remote location, endpoint, model, and allowed context scopes. API keys are accepted only by the native host and stored using protected platform storage; they are never returned to the renderer or included in normal settings JSON.
-
-Before a request leaves the device, Lycon shows the destination and the exact context category (prompt only, selected text, current page, or local file). The user must confirm the request. Lycon stores only request metadata locally—destination, connector, scope, timestamp, and result state—not the prompts or page contents. See [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md) and [LYCON_VISION.md](LYCON_VISION.md).
-
-## Hunting posture and sovereignty
-
-The visible posture control provides **Hardened**, **Balanced**, and **Permissive** modes. Hardened is intended for unknown terrain, Balanced for everyday browsing, and Permissive for trusted development contexts. Changing posture does not enable intelligence or send any data. Lycon continues to treat `localhost`, `file://`, offline pages, and local web apps as first-class explicit destinations.
-
-## Bridge architecture
-
-The legacy shells host a **platform-agnostic** UI bundle (`src/`) that does NOT call Electron's `ipcRenderer`, WinUI's `webview`, or GeckoView's `WebMessageDelegate` directly. Instead it expects a single global object — `window.__lyconNative` — to be provided by the host **before** `src/bridge/bridge.js` loads.
-
-`bridge.js` then wraps `__lyconNative` into the high-level `window.lycon` API used by all UI modules.
-
-The modern Tauri/Web stack is built differently (tRPC API + context-bridge-free, the browser engine is the Tauri/Wry or Web runtime).
-
-| Platform | How `__lyconNative` is provided |
-|---|---|
-| WinUI 3 | `AddScriptToExecuteOnDocumentCreatedAsync(bridgeScript)` |
-| GeckoView | `session.promptDelegate` intercepts `window.prompt()` |
-| ~~Electron~~ | `preload.cjs` via `contextBridge` (deprecated) |
-
-See [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md) for the full API reference.
+See [AGENT_ARCHITECTURE.md](AGENT_ARCHITECTURE.md) and
+[LYCON_VISION.md](LYCON_VISION.md) for details.
 
 ## Testing
 
-| Suite | Command | What it covers |
-|---|---|---|
-| Modern unit tests | `pnpm test` | tRPC routes + React client (`server/**/*.test.ts`, `client/src/**/*.test.ts`) — vitest |
-| Legacy E2E (reference) | `./tests/run-all-tests.sh` | drives the shared `src/` bundle via Electron; 38/40 pass (see `download/lycon-tests/test-report.json`) |
-
-The Electron E2E suite is kept as a reference harness because it exercises the shared `src/` bundle that the WinUI and Android shells also host.
-
-## Documentation
-
-| File | What it covers |
-|---|---|
-| `README.md` | Project overview + cross-platform architecture |
-| `START-HERE.md` | Getting started guide |
-| `BRIDGE_CONTRACT.md` | The `window.__lyconNative` API contract |
-| `INTEGRATION.md` | Merging the shared bundle into existing Windows + Android apps |
-| `windows/README.md` | Building the Windows .exe |
-| `android/README.md` | Building the Android .apk |
-| `src-tauri/README.md` | Tauri build notes |
-
-## Tech stack
-
-- **Modern frontend**: React 19 • TypeScript 5 • Vite • Tailwind CSS + shadcn/ui style
-- **Backend**: TypeScript (tsx) • tRPC • Express • Drizzle ORM (+ PostgreSQL/SQLite)
-- **Desktop (primary)**: Tauri 2 (Rust) + Wry webview, bundled as MSI + NSIS
-- **Web**: standalone Vite static build
-- **Windows (legacy)**: WinUI 3 (.NET 8, C#) + WebView2 + Newtonsoft.Json
-- **Android (legacy)**: Kotlin + GeckoView (Firefox engine) + built-in tracking protection
-- ~~Desktop: Electron~~ — deprecated
+```bash
+pnpm test          # unit tests via vitest
+```
 
 ## License
 

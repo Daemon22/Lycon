@@ -1,283 +1,140 @@
-# Integrating Lycon Into Your Existing Apps
+# Lycon Integration Guide
 
-This guide shows how to embed the Lycon browser UI into an existing Windows
-(WinUI 3 + WebView2) app and an existing Android (Kotlin + GeckoView) app.
+This guide explains how Lycon is built, deployed, and integrated across
+platforms. As of the **frozen baseline (v1.0.0)**, Lycon is a **single
+application** — a React + Vite frontend (`client/`) that is compiled once
+and deployed to every platform target.
+
+> **Single source of truth**: The canonical frontend lives in `client/`.
+> There is no separate UI bundle per platform. Every platform receives an
+> identical Vite build output from `dist/public/`.
 
 ## Architecture overview
 
 ```
-                +---------------------+
-                |  shared UI bundle   |   (src/index.html + src/js/* + src/styles/*)
-                |  Platform-agnostic  |
-                +----------+----------+
-                           |
-                           | loaded by native webview
-                           |
-              +------------+------------+
-              |                         |
-   +----------v----------+   +----------v----------+
-   |   Windows host      |   |   Android host      |
-   |   (WinUI 3 +        |   |   (Kotlin +         |
-   |    WebView2)        |   |    GeckoView)       |
-   |                     |   |                     |
-   |  LyconBridge.cs     |   |  LyconBridge.kt     |
-   |  LyconDataService   |   |  LyconDataService   |
-   |  LyconShieldsSvc    |   |  LyconShieldsSvc    |
-   +---------------------+   +---------------------+
+                     +-----------------------+
+                     |  client/ (React+Vite)  |
+                     |  — the ONLY frontend   |
+                     +-----------+-----------+
+                                 |
+                    pnpm run build  (Vite)
+                                 |
+                                 v
+                     +-----------------------+
+                     |  dist/public/          |
+                     |  (static bundle)       |
+                     +-----------+-----------+
+                                 |
+                  +--------------+--------------+
+                  |                             |
+                  v                             v
+        +---------+---------+        +----------+----------+
+        |  Tauri (Windows   |        | Android (Kotlin +   |
+        |  macOS Linux)     |        |  GeckoView)         |
+        |  src-tauri/       |        |  android/           |
+        +-------------------+        +---------------------+
 ```
 
-The shared UI bundle is **identical** across platforms — only the native
-bridge implementation differs. The UI talks to the bridge via the contract
-in [BRIDGE_CONTRACT.md](BRIDGE_CONTRACT.md).
+### How the UI reaches each platform
 
-## Step 1 — Drop the UI bundle into your app
+| Platform | How the UI is loaded | Build step |
+|---|---|---|
+| **Tauri desktop** (Windows, macOS, Linux) | Vite outputs to `dist/public/`; Tauri's `tauri.conf.json` `frontendDist` points to `../dist/public` | `tauri build` runs `pnpm run build` automatically |
+| **Android** | The React build is copied to `android/app/src/main/assets/lycon-ui/` and loaded via `resource://android/assets/lycon-ui/index.html` | `./sync-ui-bundle.sh` builds + copies; CI does the same |
 
-### Windows
+### Native platform layer
 
-1. Copy the entire `src/` folder to your WinUI project as `Assets/lycon-ui/`:
-   ```
-   YourWinUIApp/
-   └── Assets/
-       └── lycon-ui/
-           ├── index.html
-           ├── startpage.html
-           ├── bridge/
-           │   └── bridge.js
-           ├── js/         (all UI modules)
-           ├── styles/     (CSS)
-           └── assets/
-               ├── wolf-logo.png
-               └── brands/      (authentic local service SVG marks + manifest)
-   ```
-2. Set **Build Action** → `Content` and **Copy to Output Directory** →
-   `PreserveNewest` for all files under `Assets/lycon-ui/`.
-3. Also copy the wolf logo PNGs to `Assets/` for the tile/store icons
-   (use the sizes in `build/icon-*.png`).
+The native code on each platform provides **features the React frontend
+cannot implement on its own**:
 
-### Android
+- **Content blocking (shields)** — GeckoView's built-in tracking protection
+  on Android; the ad-blocker engine on Tauri is handled at the WebView level.
+- **HTTPS-Only mode** — native navigation delegates upgrade `http://` to
+  `https://` before the page loads.
+- **Downloads** — native download managers with progress reporting.
+- **Local file access** — platform-specific file pickers and path resolution.
 
-1. Copy the entire `src/` folder to your Android project as
-   `app/src/main/assets/lycon-ui/` (same structure as Windows).
-2. Copy launcher icons from `build/icon-*.png` into the various
-   `res/mipmap-*/` folders.
+The React frontend manages application state (tabs, bookmarks, history,
+settings) in `localStorage`, ensuring the UI is identical across platforms.
+Native layers add platform-specific protection and capabilities on top.
 
-## Step 2 — Add the bridge contract to your app
+## Building and deploying
 
-### Windows (WinUI 3 + WebView2)
+### 1. Build the canonical frontend
 
-1. Add the **Microsoft.Web.WebView2** NuGet package:
-   ```xml
-   <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />
-   ```
-2. Copy these files from `windows/LyconWindows/` into your project:
-   - `LyconBridge.cs` — handles invoke() calls from JS
-   - `LyconDataService.cs` — JSON persistence
-   - `LyconShieldsService.cs` — ad blocker
-3. Add a `WebView2` control to your window and wire up the bridge:
-   ```csharp
-   var core = await webView.EnsureCoreWebView2Async();
-   await core.AddScriptToExecuteOnDocumentCreatedAsync(bridge.GetBridgeInitScript());
-   core.WebMessageReceived += (s, e) => bridge.HandleMessageFromJs(e.TryGetWebMessageAsString());
-   core.SetVirtualHostNameToFolderMapping(
-       "lycon.app",
-       Path.Combine(AppContext.BaseDirectory, "Assets", "lycon-ui"),
-       CoreWebView2HostResourceAccessKind.Allow);
-   core.Navigate("https://lycon.app/index.html");
-   ```
-4. Set up downloads + popups + navigation handlers as shown in
-   `windows/LyconWindows/MainWindow.xaml.cs`. The reference Windows bridge also
-   implements `local:chooseFile` with `FileOpenPicker` and `local:resolvePath`
-   with `file://` URL conversion.
-
-### Android (Kotlin + GeckoView)
-
-1. Add GeckoView to `app/build.gradle.kts`:
-   ```kotlin
-   dependencies {
-       implementation("org.mozilla.geckoview:geckoview:124.0.20240311145044")
-   }
-   ```
-2. Add Mozilla's Maven repo to `settings.gradle.kts`:
-   ```kotlin
-   dependencyResolutionManagement {
-       repositories {
-           maven("https://maven.mozilla.org/maven2/")
-       }
-   }
-   ```
-3. Copy these files from `android/app/src/main/java/com/lycon/browser/` into
-   your project (adjust package name as needed):
-   - `LyconBridge.kt`
-   - `LyconDataService.kt`
-   - `LyconShieldsService.kt`
-4. Add a `GeckoView` to your layout and wire up the bridge in your Activity:
-   ```kotlin
-   val runtime = GeckoRuntime.create(this)
-   shieldsService.configureRuntime(runtime)
-
-   val session = GeckoSession()
-   session.open(runtime)
-
-   session.promptDelegate = object : GeckoSession.PromptDelegate {
-       override fun onPromptPrompt(session: GeckoSession, prompt: GeckoSession.PromptDelegate.PromptPrompt) =
-           GeckoResult.fromValue(handleBridgePrompt(prompt))
-   }
-
-   geckoView.setSession(session)
-   session.loadUri("resource://android/assets/lycon-ui/index.html")
-   ```
-5. See `android/app/src/main/java/com/lycon/browser/MainActivity.kt` for the
-   full reference implementation. Android receives a safe local-file bridge
-   response and the shared UI falls back to an Android-compatible browser file
-   input when the native picker is unavailable.
-
-## Step 3 — Test the integration
-
-### Windows
-
-1. Open `windows/LyconWindows.sln` in Visual Studio 2022 (17.10+).
-2. Set the target to `x64` and build.
-3. Run — the Lycon UI should load in the WebView2 window.
-4. Verify:
-   - Start page renders the supplied wolf logo and authentic local shortcut marks
-   - Clicking **Open a local file** opens the native picker
-   - Typing an absolute local path such as `C:\\Users\\you\\Documents\\note.html` in the URL bar opens it
-   - Typing `example.com` in the URL bar loads the site
-   - Visiting a news site shows a non-zero shields count
-   - Downloads panel shows files after download
-   - Settings persist across restarts
-
-### Android
-
-1. Open the `android/` folder in Android Studio (Hedgehog+).
-2. Let Gradle sync (it'll download GeckoView — ~50MB).
-3. Connect an Android device (API 24+) or start an emulator.
-4. Run — the Lycon UI should load in the GeckoView.
-5. Verify the same items as Windows, plus that **Open a local file** invokes the
-   browser file-input fallback and that an existing `file://` or `content://` URI
-   can be opened from the URL bar.
-
-## Step 4 — Merge with your existing app's chrome
-
-Your existing app probably has its own navigation, menu, or branding. Two
-common merge patterns:
-
-### Pattern A: Lycon as a full-screen tab in your app
-
-Launch Lycon as a separate Activity (Android) or Window (Windows) when the
-user taps a "Browser" button. Pass an initial URL via intent/launch args:
-
-```kotlin
-// Android
-val intent = Intent(this, MainActivity::class.java).apply {
-    putExtra("initialUrl", "https://example.com")
-    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-}
-startActivity(intent)
+```bash
+pnpm install           # install dependencies
+pnpm run build          # Vite build → dist/public/
 ```
 
-```csharp
-// Windows
-var window = new MainWindow();
-window.BrowserWebView.CoreWebView2.Navigate("https://example.com");
-window.Activate();
+### 2. Deploy to Android
+
+```bash
+pnpm run version:sync-ui   # builds frontend + copies to Android assets
 ```
 
-### Pattern B: Lycon as an embedded view
+Or manually:
 
-Add the WebView2/GeckoView to an existing Activity/Page in your app:
-
-```xml
-<!-- Android: existing layout fragment -->
-<fragment
-    android:name="com.lycon.browser.LyconFragment"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+```bash
+pnpm run build
+rm -rf android/app/src/main/assets/lycon-ui
+mkdir -p android/app/src/main/assets/lycon-ui
+cp -r dist/public/* android/app/src/main/assets/lycon-ui/
 ```
 
-```xml
-<!-- Windows: existing page -->
-<wv2:WebView2 x:Name="LyconWebView" />
+Then build the APK:
+
+```bash
+cd android
+./gradlew :app:assembleDebug
+# Output: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Then wire up the bridge in your host code as shown in Step 2.
+### 3. Build for Windows (Tauri)
 
-## Step 5 — Customize branding
-
-All Lycon branding is in the UI bundle:
-
-- **Wolf logo**: `lycon-ui/assets/wolf-logo.png` — replace to rebrand
-- **Brand name**: `lycon-ui/index.html` line 19 (`<span class="titlebar-name">Lycon</span>`)
-- **Start page**: `lycon-ui/startpage.html` — edit name, tagline, shortcuts
-- **Accent colors**: `lycon-ui/styles/themes.css` (`--lycon-orange`, `--lycon-purple`, `--lycon-pink`)
-- **Default search engine**: passed via `settings.json` — see `LyconDataService`
-
-## Step 6 — Share data between your app and Lycon
-
-Both `LyconDataService.cs` and `LyconDataService.kt` expose the same JSON
-file format. To share bookmarks/history between your app's existing UI and
-Lycon:
-
-1. Have your app write to the same JSON files:
-   - `%LOCALAPPDATA%\Lycon\lycon-data\bookmarks.json` (Windows)
-   - `/data/data/your.app/files/lycon-data/bookmarks.json` (Android)
-2. Use the same schema — see `BRIDGE_CONTRACT.md` for the exact types.
-3. To trigger Lycon to re-read after external writes, call
-   `window.lycon.bookmarks.list()` (or `history.list()` etc.) from JS —
-   it always returns the current on-disk contents.
-
-## Step 7 — Handle deep links
-
-To make your app open URLs in Lycon when tapped from outside:
-
-### Windows
-Register a URI scheme in your `Package.appxmanifest`:
-```xml
-<Application>
-  <uap:Extensions>
-    <uap:Protocol Name="lycon">
-      <uap:Logo>Assets\lycon-logo.png</uap:Logo>
-    </uap:Protocol>
-  </uap:Extensions>
-</Application>
+```bash
+pnpm tauri build
 ```
 
-### Android
-The provided `AndroidManifest.xml` already declares an intent-filter for
-`http://` and `https://` URLs. When another app shares a URL, your
-`MainActivity` receives it via `intent.data` — pass that to the renderer:
-```kotlin
-intent.data?.let { url ->
-    session.evaluateJavaScript("window.LyconTabs.createTab({ url: '$url' })", null)
-}
+The `tauri.conf.json` `beforeBuildCommand` automatically runs
+`pnpm run build` before packaging the Tauri bundle.
+
+## What was removed (old architecture)
+
+Before the frozen baseline (v1.0.0), the repository contained several
+out-of-sync versions of the application:
+
+| Removed item | Why it was removed |
+|---|---|
+| `web/` directory | Complete duplicate project copy with stale dependencies |
+| `src/` directory | Old static HTML/CSS/JS UI bundle (plain JS, not React) |
+| `main.js` / `main.cjs` | Old Electron main process (replaced by Tauri) |
+| `preload.js` / `preload.cjs` | Old Electron preload script (replaced by Tauri) |
+| `windows/LyconWindows/` | Old .NET 8 + WebView2 app (replaced by Tauri) |
+
+These all represented older versions that diverged from the canonical
+Windows Tauri build. They have been removed to enforce unity.
+
+## Version consistency
+
+All platform versions derive from a single `VERSION` file at the project
+root. A CI check (`scripts/check-version.cjs`) verifies that `package.json`,
+`tauri.conf.json`, and `android/app/build.gradle.kts` all reference the same
+version. This prevents version drift.
+
+```bash
+pnpm run version:check   # verifies consistency
 ```
 
-## Troubleshooting
+## Preventing future divergence
 
-### UI loads but `window.lycon` is undefined
-- Check that the bridge script is injected BEFORE other scripts run
-- On WinUI: use `AddScriptToExecuteOnDocumentCreatedAsync` (not `Navigate`'s onload)
-- On GeckoView: use `session.loadUri` first, then the prompt delegate must be set
-
-### `invoke()` calls return "No handler registered"
-- The action name in your JS call doesn't match the keys in `_handlers` (WinUI)
-  or `handlers` (Android)
-- Verify case sensitivity — actions use lowercase with colons: `settings:get`
-
-### Shields counter stays at 0
-- WinUI: verify the EasyList filter list downloaded successfully
-  (check `%LOCALAPPDATA%\Lycon\lycon-data\easylist.txt`)
-- Android: verify `shieldsService.configureRuntime(runtime)` was called
-  before any session was opened
-
-### Downloads don't trigger the file picker
-- WinUI: verify the `DownloadStarting` event handler is attached
-- Android: you'll need to use `DownloadManager` for system-level downloads
-  (GeckoView doesn't expose a download event the same way WebView2 does)
-
-## Need more help?
-
-- See `BRIDGE_CONTRACT.md` for the full API reference
-- See `windows/LyconWindows/` and `android/app/` for complete reference apps
-- Run the Electron test suite (`./tests/run-all-tests.sh`) to verify the
-  shared UI bundle itself is healthy before debugging platform bridges
+1. **CI checks** — Every push and PR runs the version consistency check.
+2. **Release workflow** — The GitHub Actions workflows (`tauri-release.yml`
+   and `android-release.yml`) build both desktop and Android from the same
+   checkout, ensuring the deployed binaries always share the same frontend.
+3. **`sync-ui-bundle.sh`** — The single script that builds the React frontend
+   and deploys it to all platform asset folders. Run this before any
+   platform-specific build.
+4. **No hand-edited copies** — Never edit files in `dist/`,
+   `android/app/src/main/assets/lycon-ui/`, or `src-tauri/` by hand.
+   Always modify `client/` source and rebuild.

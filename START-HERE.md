@@ -1,4 +1,11 @@
-# 🐺 Lycon Browser — Getting Started
+> ⚠️ **ARCHIVED DOCUMENTATION** — This file is kept for historical reference only.
+> It describes the pre-v1.0.0 architecture (`web/`, `src/`, `windows/` WinUI 3, and
+> Electron shells) that was **removed** during the v1.0.0 freeze. The current,
+> canonical project structure is documented in [README.md](README.md) and
+> [FROZEN_VERSION.md](FROZEN_VERSION.md). Do not follow this guide for building
+> or running Lycon — use README.md instead.
+
+# 🐺 Lycon Browser — Getting Started (ARCHIVED — pre-v1.0.0)
 
 You've downloaded the complete Lycon source. This guide gets you running fast.
 

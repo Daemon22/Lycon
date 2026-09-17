@@ -54,17 +54,27 @@ class MainActivity : AppCompatActivity() {
         )
 
         session = GeckoSession()
-        session.settings.userAgentOverride = "Mozilla/5.0 (Linux; Android 14) Gecko/124.0 Lycon/1.0"
+        session.settings.userAgentOverride = "Mozilla/5.0 (Linux; Android 14) Gecko/124.0 Lycon/1.0.0"
         session.open(runtime)
 
-        // Note: the shared bundle self-bootstraps window.__lyconNative via the
-        // prompt-RPC protocol (src/bridge/bridge.js) — GeckoView 124 has no
-        // script-before-navigation injection API, so no injection is needed here.
+        // The Lycon UI is the canonical React frontend built from client/
+        // (same bundle that Tauri serves on Windows). The React app is
+        // self-contained — it manages its own tabs, bookmarks, history, and
+        // settings via localStorage. GeckoView provides the native platform
+        // features that the React layer cannot implement on its own:
+        //   - Built-in content blocking (shields) via TrackingProtection
+        //   - HTTPS-Only mode via the navigation delegate below
+        //   - System download handling
+        // The prompt-RPC bridge (LyconBridge.kt) is retained so that
+        // future native↔JS features can be added without changing the
+        // asset bundle structure.
 
         // Set up delegates
         setupSessionDelegates()
 
-        // Load the Lycon UI bundle from assets/lycon-ui/index.html
+        // Load the canonical React frontend from assets/lycon-ui/index.html
+        // (synced from client/ via ./sync-ui-bundle.sh — identical to the
+        //  Windows Tauri build).
         geckoView.setSession(session)
         loadLyconUI()
 
@@ -74,7 +84,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSessionDelegates() {
-        // Prompt delegate — intercepts window.prompt() for the bridge protocol
+        // Prompt delegate — intercepts window.prompt() calls from the UI.
+        // The canonical React frontend does not use the prompt-RPC bridge for
+        // data (it manages state in localStorage), but the delegate is retained
+        // so that native↔JS features can be invoked from future UI modules or
+        // the bridge.js fallback path.
         session.promptDelegate = object : GeckoSession.PromptDelegate {
             override fun onTextPrompt(
                 session: GeckoSession,
@@ -199,8 +213,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadLyconUI() {
-        // Load the shared Lycon UI from assets/lycon-ui/index.html
-        // GeckoView can load asset:// URLs
+        // Load the canonical React frontend (built from client/) from
+        // assets/lycon-ui/index.html. This is the same bundle that Tauri
+        // serves on Windows — ensuring UI parity across platforms.
+        // GeckoView can load asset:// URLs.
         session.loadUri("resource://android/assets/lycon-ui/index.html")
     }
 

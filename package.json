@@ -4,6 +4,8 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "version:check": "node scripts/check-version.cjs",
+    "version:sync-ui": "sh sync-ui-bundle.sh",
     "dev": "cross-env NODE_ENV=development node --import tsx server/_core/index.ts",
     "build": "cross-env NODE_ENV=production vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "cross-env NODE_ENV=production node dist/index.js",

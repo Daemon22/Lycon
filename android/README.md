@@ -1,7 +1,12 @@
 # Lycon for Android (Kotlin + GeckoView)
 
-Native Android app that hosts the shared Lycon browser UI in a GeckoView control,
-using Firefox's engine and built-in tracking protection.
+Native Android app that hosts the **canonical Lycon React frontend** (built
+from `client/`) in a GeckoView control, using Firefox's engine and built-in
+tracking protection.
+
+The UI is identical to the Windows Tauri build — both render the same Vite
+output from `client/`. The native layer adds platform-specific capabilities
+(tracking protection, HTTPS-Only mode, system downloads) on top.
 
 ## Requirements
 
@@ -11,132 +16,161 @@ using Firefox's engine and built-in tracking protection.
   - Gradle 8.5+
   - NDK 26.1.10909125 (for GeckoView native libs)
 - **Android device or emulator** running API 24+ (Android 7.0+)
+- **Node.js + pnpm** (only needed to rebuild the React frontend)
 
-## Build
+## Building the APK
 
-1. Open the `android/` folder in Android Studio.
-2. Let Gradle sync (it will download GeckoView — ~50MB, first time only).
-3. Connect an Android device with USB debugging enabled, or start an emulator.
-4. Press the Run button (or `Shift+F10`).
+### Quick build (uses pre-synced assets)
 
-The app installs as "Lycon" with the wolf icon in your launcher.
+```bash
+cd android
+./gradlew :app:assembleDebug
+# Output: app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Rebuild the React frontend first
+
+After any change to `client/`:
+
+```bash
+# From the project root:
+pnpm install
+pnpm run build
+rm -rf android/app/src/main/assets/lycon-ui
+mkdir -p android/app/src/main/assets/lycon-ui
+cp -r dist/public/* android/app/src/main/assets/lycon-ui/
+```
+
+Or simply:
+
+```bash
+pnpm run version:sync-ui
+```
+
+Then rebuild:
+
+```bash
+cd android
+./gradlew :app:assembleDebug
+```
+
+The app installs as "Lycon Browser" with the Lycon logo in your launcher.
 
 ## Project layout
 
 ```
 android/
-├── settings.gradle.kts          # Includes :app, adds Mozilla Maven repo
-├── build.gradle.kts             # Top-level plugins
-├── gradle.properties            # Kotlin / AndroidX flags
-└── app/
-    ├── build.gradle.kts         # App module — GeckoView dependency
-    ├── proguard-rules.pro
-    └── src/main/
-        ├── AndroidManifest.xml  # Activity, intent-filters for http/https
-        ├── assets/
-        │   └── lycon-ui/        # Shared UI bundle (synced from ../../src/)
-        ├── java/com/lycon/browser/
-        │   ├── MainActivity.kt          # GeckoView host, prompt delegate
-        │   ├── LyconBridge.kt           # JS↔native bridge via window.prompt()
-        │   ├── LyconDataService.kt      # JSON persistence (bookmarks/history/...)
-        │   └── LyconShieldsService.kt   # GeckoView tracking protection config
-        └── res/
-            ├── layout/activity_main.xml # GeckoView container
-            ├── drawable/                # Wolf logo foreground (adaptive icon)
-            ├── mipmap-*/                # Launcher icons at all densities
-            └── values/                  # strings, colors, themes
+├── settings.gradle.kts            # Includes :app, adds Mozilla Maven repo
+├── build.gradle.kts               # Top-level plugins
+├── gradle.properties              # Kotlin / AndroidX flags
+├── README.md                      # This file
+├── gradle/
+│   └── wrapper/                   # Gradle wrapper
+├── app/
+│   ├── build.gradle.kts           # App module — version read from ../../VERSION
+│   ├── proguard-rules.pro
+│   └── src/main/
+│       ├── AndroidManifest.xml    # Activity, intent-filters for http/https
+│       ├── assets/
+│       │   └── lycon-ui/          # React frontend build output (dist/public/)
+│       ├── java/com/lycon/browser/
+│       │   ├── MainActivity.kt         # GeckoView host, navigation delegate
+│       │   ├── LyconBridge.kt          # JS←→native bridge (prompt-RPC protocol)
+│       │   ├── LyconDataService.kt     # JSON persistence (bookmarks/history/...)
+│       │   ├── LyconShieldsService.kt  # GeckoView tracking protection config
+│       │   └── LyconAgentService.kt    # Optional intelligence provider management
+│       ├── res/
+│       │   ├── layout/activity_main.xml  # GeckoView container
+│       │   ├── drawable/                 # Wolf logo foreground (adaptive icon)
+│       │   ├── mipmap-*/                 # Launcher icons at all densities
+│       │   └── values/                   # strings, colors, themes
+│       └── AndroidManifest.xml
+└── build/                          # Gradle build output (git-ignored)
 ```
 
-## How the bridge works
+## How the native bridge works
 
-GeckoView doesn't have a direct `@JavascriptInterface` like Android WebView.
-Instead, we use the standard **prompt-delegate bridge pattern**:
+The canonical React frontend (`client/`) is self-contained — it manages tabs,
+bookmarks, history, downloads, and settings in `localStorage`. It does **not**
+call `window.__lyconNative` for data operations.
 
-1. **Init script** (`LyconBridge.getBridgeInitScript()`):
-   Creates `window.__lyconNative` on every page. When JS calls
-   `__lyconNative.invoke(action, payload)`, the script encodes it as
-   `window.prompt("lycon:invoke:<callId>:<action>:<payloadJson>")`.
+However, the native layer still provides two essential platform capabilities
+that the React frontend cannot replicate:
 
-2. **Prompt delegate** (`MainActivity.handleBridgePrompt`):
-   Intercepts all `prompt()` calls from JS. If the message starts with
-   `lycon:invoke:`, it parses the callId/action/payload, dispatches to
-   the right handler, and returns the result as the prompt's response
-   (a JSON string). Otherwise, dismisses the prompt.
+1. **GeckoView Content Blocking (Shields)** — configured in
+   `LyconShieldsService.configureRuntime()` using Firefox's built-in tracking
+   protection lists. This blocks ads, trackers, cryptominers, and fingerprinters
+   at the network level, before they reach the React UI's iframes.
 
-3. **Events** (native → JS):
-   `bridge.sendEvent(event, payload)` is intended to push events to JS by calling
-   `session.evaluateJavaScript("window.__lyconBridge.onEvent(event, payload)")`,
-   forwarding to subscribers registered via `__lyconNative.on(event, cb)`.
+2. **HTTPS-Only Mode** — implemented in `MainActivity`'s
+   `NavigationDelegate.onLoadRequest`: any `http://` URL (except localhost)
+   is upgraded to `https://` before the page loads.
 
-   ⚠️ **GV124 note:** `GeckoSession.evaluateJavaScript` is absent in GV124 — see
-   `dl117.log` (`class not found` / empty method probe results). Native→JS event
-   pushes are therefore **currently deferred**. The JS→native **prompt** bridge
-   still works (the prompt delegate / `TextPrompt` path in `MainActivity.kt`),
-   so request/response calls remain functional.
+3. **The prompt-RPC bridge** (`LyconBridge.kt`) is retained so that the
+   native→JS event channel (`shell:collectEvents`) and any future JS→native
+   calls remain functional. The React frontend simply does not use these
+   calls for its current feature set.
 
-## Ad blocker (Lycon Shields)
+### Bridge protocol reference
 
-Uses GeckoView's built-in tracking protection — the same engine that powers
-Firefox Focus and Firefox for Android's strict ETP mode. Configured in
-`LyconShieldsService.configureRuntime()`:
-
-- **Ad blocking** (Disconnect ad list)
-- **Analytics trackers** (Disconnect analytics list)
-- **Social trackers** (Disconnect social list)
-- **Content trackers** (cookies + storage)
-- **Cryptomining** scripts
-- **Fingerprinting** scripts
-- **SafeBrowsing** (malware + unwanted + harmful)
-
-The `ContentBlocking.Delegate` fires `onContentBlocked` (delivered as a
-`ContentBlocking.BlockEvent`) whenever a request is rejected, which increments
-the counter and emits a `shields:blocked` event to JS.
-
-> ⚠️ **GV124 migration note:** the API moved from
-> `ContentBlockingController` / `EventDelegate` (GV117) to
-> `ContentBlocking` / `Delegate` (GV124) — see `dl117.log` for the
-> `class not found: org.mozilla.geckoview.ContentBlockingController$EventDelegate`
-> error that drove the change. The prompt delegate types moved in lockstep:
-> `PromptPrompt` → `TextPrompt` (i.e. `onTextPrompt`); native→JS event pushes are
-> deferred (see below).
+For details on the `__lyconNative` contract, see
+[`../BRIDGE_CONTRACT.md`](../BRIDGE_CONTRACT.md).
 
 ## HTTPS-Only mode
 
-Implemented in `MainActivity.NavigationDelegate.onLoadRequest`:
+Implemented in `MainActivity`'s `NavigationDelegate.onLoadRequest`:
 intercepts any `http://` URL (except localhost / 127.0.0.1) and reloads
-as `https://` before the page loads.
+as `https://` before the page loads. The React frontend's HTTPS-Only setting
+is stored in `localStorage`, but the native layer enforces it at the
+GeckoSession level for all content.
 
 ## Data storage
 
-All user data lives under `/data/data/com.lycon.browser/files/lycon-data/`:
+The React frontend persists all user data in `localStorage` (tabs,
+bookmarks, history, downloads, settings). The native `LyconDataService`
+is retained for platform features (shields settings, HTTPS-Only preference)
+that control GeckoView behavior at the native level.
 
-- `bookmarks.json`
-- `history.json`
-- `settings.json`
-- `downloads.json`
+Local data directory: `/data/data/com.lycon.browser/files/lycon-data/`
 
 ## Building an .apk / .aab
 
 ### Debug APK
 ```bash
+cd android
 ./gradlew :app:assembleDebug
 # Output: app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ### Release APK (unsigned)
 ```bash
+cd android
 ./gradlew :app:assembleRelease
 # Output: app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
 ### Android App Bundle (for Play Store)
 ```bash
+cd android
 ./gradlew :app:bundleRelease
 # Output: app/build/outputs/bundle/release/app-release.aab
 ```
 
-To sign for release, configure `signingConfigs` in `app/build.gradle.kts`
-with your keystore.
+## CI/CD
+
+GitHub Actions automatically builds the Android APK on every `v*` tag and
+on every push to `main`. The workflow:
+
+1. Checks out the repo
+2. Verifies version consistency (`pnpm run version:check`)
+3. Installs dependencies
+4. Builds the React frontend (`pnpm run build`)
+5. Syncs the build output to Android assets
+6. Builds the APK with Gradle
+7. Uploads the artifact
+
+See [`.github/workflows/android-release.yml`](../.github/workflows/android-release.yml)
+for details.
 
 ## GeckoView version notes
 
@@ -151,9 +185,3 @@ never published to the Mozilla Maven repo). To upgrade:
 
 Each GeckoView release supports the last 3 major Android versions
 (API 21+ at time of writing).
-
-## Integrating into an existing Android app
-
-See [../INTEGRATION.md](../INTEGRATION.md) for step-by-step instructions on
-embedding Lycon into your own Android app (as a Fragment, Activity, or
-embedded view).

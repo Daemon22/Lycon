@@ -1,15 +1,24 @@
 # Lycon Bridge Contract
 
-This document defines the **exact API surface** each native platform must
-implement to host the shared Lycon UI bundle.
+This document defines the **native bridge contract** that each platform's
+native layer implements. The canonical React frontend (in `client/`) is
+self-contained — it manages its own tabs, bookmarks, history, downloads, and
+settings in `localStorage`, and uses `<iframe>` elements for web browsing.
+It does **not** call `__lyconNative` for data operations.
 
-The shared UI (in `src/`) is platform-agnostic. It does NOT call Electron's
-`ipcRenderer`, WinUI's `chrome.webview`, or GeckoView's `WebMessageDelegate`
-directly. Instead, it expects a single global object — `window.__lyconNative` —
-to be provided by the host **before** `src/bridge/bridge.js` loads.
+However, the native layer is still essential for platform capabilities the
+React frontend cannot provide:
 
-`bridge.js` then wraps `__lyconNative` into the high-level `window.lycon` API
-that the UI modules use.
+- **Content blocking (shields)** — GeckoView tracking protection on Android,
+  WebView-level blocking on Tauri.
+- **HTTPS-Only mode** — native navigation delegates upgrade `http://` to `https://`.
+- **System downloads** — native download managers with progress reporting.
+- **Local file access** — platform-specific file pickers and path resolution.
+
+The `__lyconNative` bridge is retained so that native↔JS event channels
+remain available for features that require platform integration beyond what
+the React frontend can do alone. See `SINGLE_SOURCE.md` for the full
+single-source-of-truth policy.
 
 ## The contract
 
@@ -188,48 +197,34 @@ interface AgentAudit {
 
 ## Platform-specific implementation notes
 
-### Electron
+### Tauri (desktop)
 
-- `__lyconNative.invoke` → `ipcRenderer.invoke(action, payload)`
-- `local:chooseFile` → `dialog.showOpenDialog({ properties: ['openFile'] })`, returning a `file://` URL
-- `local:resolvePath` → `pathToFileURL(path.resolve(input))` with `~/` expansion
-- `agents:*` → protected connector storage, explicit HTTP request dispatch, and local metadata-only audit records
-- `agents:request` must reject payloads without `confirmed: true`
-- `__lyconNative.on` → subscribe to channel `lycon:event:${event}` via `ipcRenderer.on`
-- Main process sends events via `mainWindow.webContents.send('lycon:event:<name>', payload)`
-- See `preload.js` for the reference implementation
-
-### WinUI 3 + WebView2
-
-- Inject a script that creates `window.__lyconNative` BEFORE the page's other scripts run
-- `invoke` → call `chrome.webview.hostObjects.lycon.Invoke(action, payload)` (returns a Promise of the result)
-- `on` → listen on `window.chrome.webview.addEventListener('message', e => e.data.type === 'lycon:event' && ...)`
-- Native side calls `coreWebView2.PostWebMessageAsJson(JSON.stringify({type:'lycon:event', event, payload}))` to push events
-- See `windows/LyconWindows/LyconBridge.cs` for the reference implementation
-- **Ad blocker:** use WebView2's `NavigationStarting` event + a URL filter (EasyList parsed in C#), or use the `AddScriptToExecuteOnDocumentCreated` to inject a uBlock-style cosmetic filter
+- Tauri 2 loads the Vite-built `dist/public/` as its `frontendDist`.
+- The Rust shell (`src-tauri/src/main.rs`) provides the WebView container.
+- Content blocking and HTTPS-only are handled by the WebView at the
+  framework level.
 
 ### Android + GeckoView
 
-- Use `GeckoSession.WebMessageDelegate` to receive `window.postMessage` calls from JS
-- Inject a script via `session.loadString(...)` or `runtime.loadAddonScript(...)` that creates `window.__lyconNative`
-- `invoke` → JS calls `window.__lyconBridge.send(JSON.stringify({action, payload, id}))` and awaits a response message
-- `on` → JS subscribes; native pushes events via `session.evaluateJavaScript("window.__lyconBridge.onEvent(event, payload)")`
-- See `android/app/src/main/java/com/lycon/browser/LyconBridge.kt` for the reference implementation
-- **Ad blocker:** GeckoView's `Runtime` ships with built-in tracking protection. Enable it via `runtime.settings.trackingProtectionEnabled = true`. For URL-based ad blocking (cosmetic + EasyList), use `ContentBlockingController` to register custom filter lists.
+- Load the React build from `resource://android/assets/lycon-ui/index.html`.
+- GeckoView's prompt delegate intercepts `window.prompt()` if the React app
+  ever needs JS→native calls (currently self-contained in localStorage).
+- Content blocking is configured via `LyconShieldsService.configureRuntime(runtime)`
+  at the `GeckoRuntime` level — applies to all sessions automatically.
+- HTTPS-only is enforced in `MainActivity`'s `NavigationDelegate.onLoadRequest`.
+- See `android/app/src/main/java/com/lycon/browser/MainActivity.kt` for the
+  full reference implementation.
+- Android receives a safe local-file bridge response and the React UI falls
+  back to an Android-compatible browser file input when the native picker is
+  unavailable.
 
 ## Script load order
 
-The host must ensure scripts load in this order:
+The canonical React frontend is built by Vite into a static bundle
+(`dist/public/`). The built `index.html` references hashed JS/CSS bundles
+that are loaded automatically — there is no manual script ordering.
 
-1. **Native bridge script** — creates `window.__lyconNative`
-   - Electron: `preload.js` (via `webPreferences.preload`)
-   - WinUI: `coreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(lyconNativeScript)`
-   - GeckoView: prepend to the loaded HTML, or use `runtime.loadAddonScript`
-
-2. **`src/bridge/bridge.js`** — wraps `__lyconNative` into `window.lycon`
-
-3. **UI modules** (`src/js/state.js`, `tabs.js`, `navigation.js`, etc.)
-
-4. **`src/js/app.js`** — initialization (creates the first tab, loads the start page)
-
-The provided `src/index.html` already loads scripts in this order via `<script>` tags.
+Native bridge scripts (e.g., GeckoView's prompt RPC adapter) are injected
+or handled by the native host before the page loads. The React app does not
+depend on `__lyconNative` for its core functionality, but native features
+(shields, HTTPS-only, downloads) are active regardless.

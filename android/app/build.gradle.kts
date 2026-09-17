@@ -7,12 +7,18 @@ android {
     namespace = "com.lycon.browser"
     compileSdk = 34
 
+    // Read the canonical version from the project root VERSION file.
+    // This is the single source of truth — package.json, tauri.conf.json,
+    // and this file all derive from it to prevent version drift across platforms.
+    val lyconVersion = file("${rootProject.projectDir}/../../VERSION").readText().trim()
+    val lyconVersionParts = lyconVersion.split(".")
+
     defaultConfig {
         applicationId = "com.lycon.browser"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = lyconVersionParts[0].toInt() * 10000 + lyconVersionParts[1].toInt() * 100 + lyconVersionParts[2].toInt()
+        versionName = lyconVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

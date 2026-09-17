@@ -264,3 +264,33 @@ Desktop and narrow mobile captures confirm the canonical LYCON logo is used cons
 - [x] Add a visible toolbar sync-status indicator for off, syncing, synced, and conflict/error states.
 - [x] Add a persisted dark/light mode toggle in Settings without changing the current layout.
 - [x] Validate the workflow configuration, sync indicator states, theme toggle, and responsive presentation, then save a checkpoint.
+
+## Unified Baseline — Freeze (v1.0.0)
+
+> **Frozen: 2026-09-15 — version 1.0.0**
+>
+> See `FROZEN_VERSION.md` and `SINGLE_SOURCE.md` for the full policy.
+
+The application previously had multiple divergent versions across platforms.
+The canonical version used on Windows (React + Vite frontend in `client/`,
+served by Tauri) has now been unified as the single source of truth for all
+platforms. The following actions establish the freeze:
+
+- [x] **Single canonical frontend** — `client/` (React 19 + Vite 7 + TypeScript + Tailwind) is the only UI source. No per-platform variants.
+- [x] **Removed `web/`** — complete duplicate project with stale dependencies removed.
+- [x] **Removed `src/`** — old static HTML/CSS/Vanilla-JS UI bundle (used by legacy Android/WPF) removed; replaced by the React frontend.
+- [x] **Removed Electron entry points** — `main.js`, `main.cjs`, `preload.js`, `preload.cjs` deleted (Tauri is the canonical desktop target).
+- [x] **Removed `windows/`** — old WinUI 3 / WPF (.NET 8 + WebView2) app deleted (Tauri replaces it).
+- [x] **Removed stale log files** — 18 build/test logs at project root deleted.
+- [x] **Unified version** — `1.0.0` consistent across `VERSION`, `package.json`, `src-tauri/tauri.conf.json`, and `android/app/build.gradle.kts`.
+- [x] **Android assets synced** — `android/app/src/main/assets/lycon-ui/` now contains the fresh React/Vite build output from `dist/public/`.
+- [x] **`sync-ui-bundle.sh` rewritten** — builds `client/` → `dist/public/` and copies to Android assets. No references to removed directories.
+- [x] **`package.json` scripts added** — `version:check` (runs `scripts/check-version.cjs`) and `version:sync-ui`.
+- [x] **`scripts/check-version.cjs`** — Node.js CI check that verifies version consistency across all platform configs. Fails the build on drift.
+- [x] **Android CI/CD workflow** — `.github/workflows/android-release.yml` builds APK from the React frontend + native code, runs on version tags and PRs.
+- [x] **Tauri CI updated** — `tauri-release.yml` now runs the version check step.
+- [x] **`.gitignore` updated** — excludes `android/.gradle/`, `android/app/build/`, `android/.kotlin/`, `src-tauri/target/`, and synced UI assets (`android/app/src/main/assets/lycon-ui/`).
+- [x] **Documentation updated** — `README.md`, `INTEGRATION.md`, `android/README.md`, `src-tauri/README.md`, `BRIDGE_CONTRACT.md` all rewritten to reflect the unified architecture.
+- [x] **`SINGLE_SOURCE.md` created** — documents the single-source-of-truth policy, version management, and drift prevention.
+- [x] **`FROZEN_VERSION.md` created** — sentinel file declaring the frozen state.
+
