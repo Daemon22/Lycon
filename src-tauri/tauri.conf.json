@@ -25,20 +25,6 @@
       "csp": null
     }
   },
-  "capabilities": [
-    {
-      "identifier": "default",
-      "description": "Default Lycon Browser desktop permissions",
-      "windows": ["main"],
-      "permissions": [
-        "core:default",
-        "opener:default",
-        "core:window:default",
-        "core:event:default",
-        "core:app:default"
-      ]
-    }
-  ],
   "bundle": {
     "active": true,
     "targets": "all",

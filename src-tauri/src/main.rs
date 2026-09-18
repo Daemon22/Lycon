@@ -1,9 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::{Mutex, OnceLock};
-use tauri::{command, AppHandle, Runtime};
+use tauri::{Emitter, Manager};
 use url::Url;
 
+// Navigation-level interception only; subresource requests are not blocked.
+// This is partial parity with Android GeckoView shields.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ShieldsState {
     pub enabled: bool,
@@ -17,16 +19,20 @@ fn shields() -> &'static Mutex<ShieldsState> {
     SHIELDS_STATE.get_or_init(|| Mutex::new(ShieldsState::default()))
 }
 
-#[command]
-pub fn get_shields_state() -> ShieldsState {
-    shields().lock().unwrap().clone()
-}
+mod commands {
+    use super::{shields, ShieldsState};
 
-#[command]
-pub fn set_shields_state(state: ShieldsState) -> ShieldsState {
-    let mut current = shields().lock().unwrap();
-    *current = state.clone();
-    state
+    #[tauri::command]
+    pub fn get_shields_state() -> ShieldsState {
+        shields().lock().unwrap().clone()
+    }
+
+    #[tauri::command]
+    pub fn set_shields_state(state: ShieldsState) -> ShieldsState {
+        let mut current = shields().lock().unwrap();
+        *current = state.clone();
+        state
+    }
 }
 
 fn is_local_host(host: &str) -> bool {
@@ -94,25 +100,29 @@ fn evaluate_navigation(raw_url: &str, state: &ShieldsState) -> Result<String, St
 
 fn main() {
     tauri::Builder::default()
-        .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
-                let app_handle = app.handle().clone();
-                window.on_navigation(move |_app, url| {
+        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri::plugin::Builder::<_, ()>::new("lycon-navigation")
+                .on_navigation(|webview, url| {
                     let state = shields().lock().unwrap().clone();
                     match evaluate_navigation(url.as_str(), &state) {
                         Ok(next_url) => {
                             if next_url != url.as_str() {
-                                let _ = app_handle.emit_all("lycon://navigation-upgrade", next_url);
+                                let _ = webview
+                                    .app_handle()
+                                    .emit("lycon://navigation-upgrade", next_url);
                             }
-                            Ok(())
+                            true
                         }
-                        Err(_) => Err("blocked by Lycon shields".to_string()),
+                        Err(_) => false,
                     }
-                });
-            }
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![get_shields_state, set_shields_state])
+                })
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![
+            commands::get_shields_state,
+            commands::set_shields_state
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Lycon Browser");
 }
