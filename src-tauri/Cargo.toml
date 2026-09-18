@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+url = "2.5"
 
 [features]
 default = ["custom-protocol"]

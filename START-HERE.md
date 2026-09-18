@@ -1,3 +1,5 @@
+ARCHIVED — see README.md
+
 > ⚠️ **ARCHIVED DOCUMENTATION** — This file is kept for historical reference only.
 > It describes the pre-v1.0.0 architecture (`web/`, `src/`, `windows/` WinUI 3, and
 > Electron shells) that was **removed** during the v1.0.0 freeze. The current,
