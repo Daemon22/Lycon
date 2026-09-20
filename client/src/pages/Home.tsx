@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type R
 import html2canvas from "html2canvas";
 import { SOUTH_AFRICAN_ENGLISH, VOSK_CATALOG as voskCatalog, interpretSpeechAvailability, normalizeVoiceLanguage } from "@/lib/voice";
 import { useLyconCore } from "@/core/useLyconCore";
+import { syncNativeShields } from "@/core/platformCapabilities";
 import type { TabId } from "../../../core/types/00_ids";
 import type { CoreEvent } from "../../../core/types/04_events";
 import {
@@ -411,6 +412,13 @@ export default function Home() {
     setSettings((previous) => (previous.shieldsEnabled === shields ? previous : { ...previous, shieldsEnabled: shields }));
   }, [coreState.thresholdState, coreState.isReady]);
 
+  useEffect(() => {
+    if (!coreState.isReady) return;
+    void syncNativeShields(settings.shieldsEnabled).catch((error) => {
+      console.error("Native shield initialization failed:", error);
+    });
+  }, [coreState.isReady]);
+
   // Bind the engine surface when the live container mounts (deliberate
   // handoff opened, or an online tab activated). The React DOM lifecycle owns
   // when the container exists; the engine adapter renders inside it.
@@ -613,7 +621,17 @@ export default function Home() {
     if (!coreState.isReady || !coreState.activeTabId) return;
     const events = await setShields(coreState.activeTabId, newState, activePage.url);
     const thresholdChanged = events.some((event) => newState ? event.type === "ThresholdSealed" : event.type === "ThresholdOpened");
-    if (thresholdChanged) updateSetting("shieldsEnabled", newState);
+    if (!thresholdChanged) return;
+    try {
+      await syncNativeShields(newState);
+      updateSetting("shieldsEnabled", newState);
+    } catch (error) {
+      console.error("Native shield synchronization failed:", error);
+      const rollback = await setShields(coreState.activeTabId, !newState, activePage.url);
+      if (rollback.some((event) => newState ? event.type === "ThresholdOpened" : event.type === "ThresholdSealed")) {
+        showToast("Shield change was rejected by the native boundary");
+      }
+    }
   };
   const installVoskPack = async () => { setVoskPack((previous) => ({ ...previous, status: "downloading" })); try { const response = await fetch("https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"); if (!response.ok) throw new Error("pack unavailable"); const archive = await response.blob(); await new Promise<void>((resolve, reject) => { const request = indexedDB.open("lycon-voice-packs", 1); request.onupgradeneeded = () => request.result.createObjectStore("packs"); request.onerror = () => reject(request.error); request.onsuccess = () => { const transaction = request.result.transaction("packs", "readwrite"); transaction.objectStore("packs").put(archive, "vosk-small-en-us"); transaction.oncomplete = () => resolve(); transaction.onerror = () => reject(transaction.error); }; }); setVoskPack({ status: "ready", name: "English (US) · small", size: "40 MB", downloadedAt: new Date().toISOString() }); showToast("Offline language pack downloaded locally"); } catch { setVoskPack((previous) => ({ ...previous, status: "not-installed" })); showToast("Language pack could not be downloaded"); } };
   const removeVoskPack = () => { try { const request = indexedDB.open("lycon-voice-packs", 1); request.onsuccess = () => request.result.transaction("packs", "readwrite").objectStore("packs").delete("vosk-small-en-us"); } catch { /* IndexedDB can be unavailable in restricted contexts */ } setVoskPack({ status: "not-installed", name: "English (US) · small", size: "40 MB" }); showToast("Offline language pack removed"); };

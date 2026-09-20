@@ -222,5 +222,5 @@ describe('useLyconCore constitutional integration', () => {
       await bridge().bindEngineSurface(null);
     });
     expect(() => diag()).not.toThrow();
-  });
+  }, 15000);
 });

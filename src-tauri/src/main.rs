@@ -6,11 +6,21 @@ use url::Url;
 
 // Navigation-level interception only; subresource requests are not blocked.
 // This is partial parity with Android GeckoView shields.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ShieldsState {
     pub enabled: bool,
     pub https_only: bool,
     pub tracker_blocking: bool,
+}
+
+impl Default for ShieldsState {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            https_only: true,
+            tracker_blocking: true,
+        }
+    }
 }
 
 static SHIELDS_STATE: OnceLock<Mutex<ShieldsState>> = OnceLock::new();
@@ -23,15 +33,23 @@ mod commands {
     use super::{shields, ShieldsState};
 
     #[tauri::command]
-    pub fn get_shields_state() -> ShieldsState {
-        shields().lock().unwrap().clone()
+    pub fn get_shields_state() -> Result<ShieldsState, String> {
+        shields()
+            .lock()
+            .map(|state| state.clone())
+            .map_err(|_| "shields state lock poisoned".to_string())
     }
 
     #[tauri::command]
-    pub fn set_shields_state(state: ShieldsState) -> ShieldsState {
-        let mut current = shields().lock().unwrap();
+    pub fn set_shields_state(state: ShieldsState) -> Result<ShieldsState, String> {
+        if state.tracker_blocking && !state.enabled {
+            return Err("tracker blocking requires shields to be enabled".to_string());
+        }
+        let mut current = shields()
+            .lock()
+            .map_err(|_| "shields state lock poisoned".to_string())?;
         *current = state.clone();
-        state
+        Ok(state)
     }
 }
 
@@ -104,7 +122,10 @@ fn main() {
         .plugin(
             tauri::plugin::Builder::<_, ()>::new("lycon-navigation")
                 .on_navigation(|webview, url| {
-                    let state = shields().lock().unwrap().clone();
+                    let state = match shields().lock() {
+                        Ok(state) => state.clone(),
+                        Err(_) => return false,
+                    };
                     match evaluate_navigation(url.as_str(), &state) {
                         Ok(next_url) => {
                             if next_url != url.as_str() {
