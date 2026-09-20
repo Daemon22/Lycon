@@ -296,6 +296,16 @@ export interface EngineAdapter {
   attach(context: EngineContext): Promise<void>;
 
   /**
+   * Bind (or unbind) the live DOM container for a tab's rendering surface.
+   * The Core passes `container: null` by design — the Shell injects the real
+   * container here, outside command dispatch. This is the ONLY way a surface
+   * container reaches the engine; the adapter never reads browser globals.
+   *
+   * Optional so test doubles (FakeEngineAdapter) need not implement it.
+   */
+  bindContainer?(tabId: TabId, container: HTMLElement | null): Promise<void>;
+
+  /**
    * Detach the engine from a tab's rendering surface.
    * Called by the Core when a tab is hidden or destroyed.
    * The adapter must release all engine resources (memory, network, etc.)

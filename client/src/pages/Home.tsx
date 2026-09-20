@@ -6,6 +6,9 @@ import { syncIndicatorKind } from "@/lib/syncStatus";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import html2canvas from "html2canvas";
 import { SOUTH_AFRICAN_ENGLISH, VOSK_CATALOG as voskCatalog, interpretSpeechAvailability, normalizeVoiceLanguage } from "@/lib/voice";
+import { useLyconCore } from "@/core/useLyconCore";
+import type { TabId } from "../../../core/types/00_ids";
+import type { CoreEvent } from "../../../core/types/04_events";
 import {
   ArrowLeft,
   ArrowRight,
@@ -42,7 +45,6 @@ import {
   Upload,
   FileJson,
   Trash2,
-  WifiOff,
   X,
   EyeOff,
   type LucideIcon,
@@ -56,7 +58,7 @@ type VoiceMode = "online" | "on-device" | "vosk";
 type VoskPackState = { status: "not-installed" | "downloading" | "ready"; name: string; size: string; downloadedAt?: string };
 
 type Tab = {
-  id: number;
+  id: TabId;
   title: string;
   favicon?: string;
   isPrivate: boolean;
@@ -111,7 +113,7 @@ type SyncPayload = {
   history: HistoryItem[];
   downloads: Omit<DownloadItem, "content">[];
   tabs: Tab[];
-  activeTabId: number;
+  activeTabId: TabId;
   settings: SettingsState;
 };
 
@@ -132,7 +134,11 @@ const initialHistory: HistoryItem[] = [
   { id: "history-3", title: "Example Domain", url: "https://example.com", kind: "online", visited: "Yesterday", visitedAt: Date.now() - 1000 * 60 * 60 * 26 },
 ];
 
-const initialTabs: Tab[] = [  { id: 1, title: "Start", isPrivate: false, favicon: "/assets/lycon-logo.png", history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" }], historyIndex: 0 }];
+const INITIAL_TAB_ID = "tb_ui_initial" as TabId;
+
+const initialTabs: Tab[] = [
+  { id: INITIAL_TAB_ID, title: "Start", isPrivate: false, favicon: "/assets/lycon-logo.png", history: [{ title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" }], historyIndex: 0 },
+];
 
 const defaultSettings: SettingsState = {
   theme: "dark",
@@ -169,7 +175,7 @@ function parseSyncPayload(raw: string): SyncPayload | null {
       history: parsed.history.filter(isHistoryItem),
       downloads: Array.isArray(parsed.downloads) ? parsed.downloads.filter((item): item is SyncPayload["downloads"][number] => Boolean(item && typeof item === "object" && typeof (item as DownloadItem).id === "string" && typeof (item as DownloadItem).name === "string")) : [],
       tabs: parsed.tabs,
-      activeTabId: typeof parsed.activeTabId === "number" ? parsed.activeTabId : parsed.tabs[0]?.id ?? 1,
+      activeTabId: typeof parsed.activeTabId === "string" ? (parsed.activeTabId as TabId) : typeof parsed.tabs[0]?.id === "string" ? (parsed.tabs[0].id as TabId) : INITIAL_TAB_ID,
       settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
     };
   } catch {
@@ -225,11 +231,16 @@ function createDestination(value: string): PageRecord {
 
 export default function Home() {
   // The useAuth hook provides authentication state.
-  // To implement login/logout, call logout(), or start login from an event
+  // To implement login/logout, call logout(), or startLogin from an event
   // handler: onClick={() => startLogin()} (imported from "@/const"). Never call
   // startLogin() during render (no href={startLogin()}) — it mints a one-time
   // nonce cookie and must run only at the moment of navigation.
   let { user, loading, error, isAuthenticated, logout } = useAuth();
+
+  // Constitutional core integration — the single live core instance.
+  // The UI is a mirror: all navigation, tab lifecycle, and boundary changes
+  // are routed through LyconCore (command/event → policy → engine contract).
+  const { state: coreState, core: lyconCore, dispatch, navigate, goBack, goForward, createTab, activateTab, closeTab: closeCoreTab, setShields, bindEngineSurface } = useLyconCore();
 
   const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
   const [voskPack, setVoskPack] = usePersistedState<VoskPackState>("lycon-vosk-pack", { status: "not-installed", name: "English (US) · small", size: "40 MB" });
@@ -237,7 +248,7 @@ export default function Home() {
   const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory);
   const [downloads, setDownloads] = usePersistedState<DownloadItem[]>("lycon-downloads", readDownloads());
   const [tabs, setTabs] = usePersistedState<Tab[]>("lycon-tabs", initialTabs);
-  const [activeTabId, setActiveTabId] = usePersistedState<number>("lycon-active-tab", 1);
+  const [activeTabId, setActiveTabId] = usePersistedState<TabId>("lycon-active-tab", INITIAL_TAB_ID);
   const [currentView, setCurrentView] = useState<View>(() => viewFromPath(window.location.pathname));
   const [activePage, setActivePage] = useState<PageRecord>({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
   const [address, setAddress] = useState("");
@@ -255,9 +266,9 @@ export default function Home() {
   const lastSyncedPayloadRef = useRef("");
   const syncQuery = trpc.sync.get.useQuery(undefined, { enabled: isAuthenticated && settings.syncEnabled === true, retry: false });
   const syncPut = trpc.sync.put.useMutation();
-  const [draggingTabId, setDraggingTabId] = useState<number | null>(null);
-  const [pressingTabId, setPressingTabId] = useState<number | null>(null);
-  const tabPointerRef = useRef<{ id: number; moved: boolean; touch: boolean } | null>(null);
+  const [draggingTabId, setDraggingTabId] = useState<TabId | null>(null);
+  const [pressingTabId, setPressingTabId] = useState<TabId | null>(null);
+  const tabPointerRef = useRef<{ id: TabId; moved: boolean; touch: boolean } | null>(null);
   const tabLongPressRef = useRef<number | null>(null);
   const suppressTabClickRef = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -265,8 +276,10 @@ export default function Home() {
   const addressInputRef = useRef<HTMLInputElement>(null);
   const overflowButtonRef = useRef<HTMLButtonElement>(null);
   const overflowShellRef = useRef<HTMLDivElement>(null);
+  const coreContainerRef = useRef<HTMLDivElement>(null);
 
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+  const renderedActiveTabId = coreState.isReady ? (coreState.activeTabId ?? activeTabId) : activeTabId;
+  const activeTab = tabs.find((tab) => tab.id === renderedActiveTabId) ?? tabs[0];
   const shellState = activeTab?.isPrivate ? "private" : activePage.kind === "online" ? "online" : "local";
   const voiceMode = settings.voiceMode ?? "online";
   const isBookmarked = bookmarks.some((bookmark) => bookmark.url === activePage.url);
@@ -361,6 +374,52 @@ export default function Home() {
     window.history.replaceState({}, "", routePath(restoredPage.view ?? "online"));
   }, []);
 
+  // Reconcile the React tab mirror with the core-owned tab graph. Core TabIds
+  // are authoritative; legacy (numeric) persisted tab ids are replaced by the
+  // core tabs, inheriting their metadata by index.
+  useEffect(() => {
+    if (!coreState.isReady || coreState.tabs.length === 0) return;
+    setTabs((previous) => {
+      const seen = new Set<TabId>();
+      const next = coreState.tabs.map((coreTab, index) => {
+        seen.add(coreTab.id);
+        const existing = previous.find((tab) => tab.id === coreTab.id);
+        if (existing) return existing;
+        const legacy = previous[index];
+        const startPage: PageRecord = { title: coreTab.isPrivate ? "Private" : "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
+        return {
+          id: coreTab.id,
+          title: legacy?.title ?? startPage.title,
+          favicon: legacy?.favicon,
+          isPrivate: coreTab.isPrivate || legacy?.isPrivate === true,
+          history: legacy?.history?.length ? legacy.history : [startPage],
+          historyIndex: legacy?.historyIndex ?? 0,
+        };
+      });
+      const orphansDropped = previous.some((tab) => !seen.has(tab.id));
+      const sizeChanged = next.length !== previous.length || previous.some((tab, index) => next[index]?.id !== tab.id);
+      if (!orphansDropped && !sizeChanged) return previous;
+      return next;
+    });
+    setActiveTabId((current) => (coreState.activeTabId && current !== coreState.activeTabId ? coreState.activeTabId : current));
+  }, [coreState.isReady, coreState.activeTabId, coreState.tabs]);
+
+  // Mirror the core's threshold in the shields setting: sealed → shields ON.
+  useEffect(() => {
+    if (!coreState.isReady || !coreState.thresholdState) return;
+    const shields = coreState.thresholdState === "sealed";
+    setSettings((previous) => (previous.shieldsEnabled === shields ? previous : { ...previous, shieldsEnabled: shields }));
+  }, [coreState.thresholdState, coreState.isReady]);
+
+  // Bind the engine surface when the live container mounts (deliberate
+  // handoff opened, or an online tab activated). The React DOM lifecycle owns
+  // when the container exists; the engine adapter renders inside it.
+  useEffect(() => {
+    if (!coreState.isReady || !coreState.activeTabId || !onlineOpened) return;
+    void bindEngineSurface(coreContainerRef.current);
+    return () => { void bindEngineSurface(null); };
+  }, [onlineOpened, coreState.isReady, coreState.activeTabId, bindEngineSurface]);
+
   useEffect(() => {
     const handlePopState = () => {
       const view = viewFromPath(window.location.pathname);
@@ -386,18 +445,51 @@ export default function Home() {
     setTabs((previous) => previous.map((tab) => tab.id === activeTabId ? { ...tab, ...patch } : tab));
   };
 
-  const navigateTo = (destination: PageRecord) => {
+  const navigateTo = async (destination: PageRecord) => {
     const nextView = destination.view ?? "online";
     setOverflowOpen(false);
+
+    // Online destinations are INTENTIONAL handoffs: the request stays at the
+    // sealed threshold until the user confirms with "Open inside Lycon". No
+    // core navigation is issued here, so the boundary never opens implicitly.
+    if (destination.kind === "online") {
+      setCurrentView(nextView);
+      window.history.pushState({}, "", routePath(nextView));
+      setActivePage(destination);
+      setAddress(addressForPage(destination));
+      setOnlineOpened(false);
+      return;
+    }
+
+    if (!coreState.isReady || !coreState.activeTabId) return;
+
+    // The Core owns local navigation and history. The shell mirrors the page
+    // only after the command has produced a completed navigation event.
+    const events = await navigate(coreState.activeTabId, destination.url);
+    if (!events.some((event) => event.type === "NavigationCompleted")) return;
     setCurrentView(nextView);
     window.history.pushState({}, "", routePath(nextView));
     setActivePage(destination);
     setAddress(addressForPage(destination));
     setOnlineOpened(false);
+
     const nextHistory = [...(activeTab?.history ?? []), destination];
     updateTab({ title: destination.title, favicon: destination.favicon, history: nextHistory, historyIndex: nextHistory.length - 1 });
     const nextHistoryEntry: HistoryItem = { ...destination, id: `history-${Date.now()}`, visited: "Just now", visitedAt: Date.now() };
     setHistoryEntries((previous) => [nextHistoryEntry, ...previous.filter((item) => item.url !== destination.url)].slice(0, 50));
+  };
+
+  const openOnlinePage = async () => {
+    if (!coreState.isReady || !coreState.activeTabId) return;
+    const tabId = coreState.activeTabId;
+    const url = activePage.url;
+    // Deliberate consent: open the boundary, then drive the navigation through
+    // the core so Net capabilities (CanNetwork/CanEmbedContent) are granted
+    // and the RealEngineAdapter renders the page in the engine surface.
+    const opened = await setShields(tabId, false, url);
+    if (!opened.some((event) => event.type === "ThresholdOpened")) return;
+    const navigated = await navigate(tabId, url);
+    if (navigated.some((event) => event.type === "NavigationCompleted")) setOnlineOpened(true);
   };
 
   const navigateView = (view: View) => {
@@ -410,56 +502,76 @@ export default function Home() {
     if (address.trim()) navigateTo(createDestination(address));
   };
 
-  const navigateBack = () => {
-    if (!activeTab || activeTab.historyIndex <= 0) return;
-    const nextIndex = activeTab.historyIndex - 1;
-    const destination = activeTab.history[nextIndex];
+  const navigateBack = async () => {
+    if (!activeTab || !coreState.isReady || !coreState.activeTabId) return;
+    const events = await goBack(coreState.activeTabId);
+    const completed = events.find((event): event is Extract<CoreEvent, { type: "NavigationCompleted" }> => event.type === "NavigationCompleted");
+    if (!completed) return;
+    const destination = createDestination(completed.finalUrl);
+    const nextIndex = Math.max(0, activeTab.historyIndex - 1);
+
     updateTab({ historyIndex: nextIndex, title: destination.title, favicon: destination.favicon });
     setCurrentView(destination.view ?? "online");
     window.history.replaceState({}, "", routePath(destination.view ?? "online"));
     setActivePage(destination);
     setAddress(addressForPage(destination));
+    setOnlineOpened(destination.kind === "online");
   };
 
-  const navigateForward = () => {
-    if (!activeTab || activeTab.historyIndex >= activeTab.history.length - 1) return;
-    const nextIndex = activeTab.historyIndex + 1;
-    const destination = activeTab.history[nextIndex];
+  const navigateForward = async () => {
+    if (!activeTab || !coreState.isReady || !coreState.activeTabId) return;
+    const events = await goForward(coreState.activeTabId);
+    const completed = events.find((event): event is Extract<CoreEvent, { type: "NavigationCompleted" }> => event.type === "NavigationCompleted");
+    if (!completed) return;
+    const destination = createDestination(completed.finalUrl);
+    const nextIndex = Math.min(activeTab.history.length - 1, activeTab.historyIndex + 1);
+
     updateTab({ historyIndex: nextIndex, title: destination.title, favicon: destination.favicon });
     setCurrentView(destination.view ?? "online");
     window.history.replaceState({}, "", routePath(destination.view ?? "online"));
     setActivePage(destination);
     setAddress(addressForPage(destination));
+    setOnlineOpened(destination.kind === "online");
   };
 
-  const newPrivateTab = () => {
-    const id = Date.now();
-    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
-    setTabs((previous) => [...previous, { id, title: "Private", isPrivate: true, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
-    setActiveTabId(id);
+  const mirrorNewTab = (id: TabId, title: string) => {
     setCurrentView("start");
     window.history.pushState({}, "", "/");
-    setActivePage({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
+    setActivePage({ title, url: "lycon://start", kind: "local", view: "start" });
     setAddress("");
+  };
+
+  const newPrivateTab = async () => {
+    if (!coreState.isReady || !coreState.windowId) return;
+    const events = await createTab(coreState.windowId, true);
+    const created = events.find((event): event is Extract<CoreEvent, { type: "TabCreated" }> => event.type === "TabCreated");
+    if (!created) return;
+    const activated = await activateTab(created.tabId);
+    if (!activated.some((event) => event.type === "TabActivated")) return;
+    mirrorNewTab(created.tabId, "Private");
     showToast("Private tab opened");
   };
 
-  const newTab = () => {
-    const id = Date.now();
-    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
-    setTabs((previous) => [...previous, { id, title: "Start", isPrivate: false, favicon: startPage.favicon, history: [startPage], historyIndex: 0 }]);
-    setActiveTabId(id);
-    setCurrentView("start");
-    window.history.pushState({}, "", "/");
-    setActivePage({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
-    setAddress("");
+  const newTab = async () => {
+    if (!coreState.isReady || !coreState.windowId) return;
+    const events = await createTab(coreState.windowId, false);
+    const created = events.find((event): event is Extract<CoreEvent, { type: "TabCreated" }> => event.type === "TabCreated");
+    if (!created) return;
+    const activated = await activateTab(created.tabId);
+    if (!activated.some((event) => event.type === "TabActivated")) return;
+    mirrorNewTab(created.tabId, "Start");
   };
 
-  const closeTab = (id: number) => {
-    if (tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
-    const remaining = tabs.filter((tab) => tab.id !== id);
-    setTabs(remaining);
-    if (id === activeTabId) setActiveTabId(remaining[remaining.length - 1].id);
+  const closeLocalTab = async (id: TabId) => {
+    if (coreState.isReady && coreState.tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
+    if (!coreState.isReady && tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
+
+    if (coreState.isReady) {
+      const events = await closeCoreTab(id);
+      if (!events.some((event) => event.type === "TabClosed")) return;
+    }
+
+    setTabs((previous) => previous.filter((tab) => tab.id !== id));
   };
 
   const togglePrivate = () => {
@@ -494,6 +606,15 @@ export default function Home() {
   };
 
   const updateSetting = <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => setSettings((previous) => ({ ...previous, [key]: value }));
+  // Shields map onto the core threshold (Article IV): ON → boundary sealed
+  // (external capabilities revoked), OFF → boundary open (can load online).
+  const toggleShields = async (setTo?: boolean) => {
+    const newState = typeof setTo === "boolean" ? setTo : !settings.shieldsEnabled;
+    if (!coreState.isReady || !coreState.activeTabId) return;
+    const events = await setShields(coreState.activeTabId, newState, activePage.url);
+    const thresholdChanged = events.some((event) => newState ? event.type === "ThresholdSealed" : event.type === "ThresholdOpened");
+    if (thresholdChanged) updateSetting("shieldsEnabled", newState);
+  };
   const installVoskPack = async () => { setVoskPack((previous) => ({ ...previous, status: "downloading" })); try { const response = await fetch("https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"); if (!response.ok) throw new Error("pack unavailable"); const archive = await response.blob(); await new Promise<void>((resolve, reject) => { const request = indexedDB.open("lycon-voice-packs", 1); request.onupgradeneeded = () => request.result.createObjectStore("packs"); request.onerror = () => reject(request.error); request.onsuccess = () => { const transaction = request.result.transaction("packs", "readwrite"); transaction.objectStore("packs").put(archive, "vosk-small-en-us"); transaction.oncomplete = () => resolve(); transaction.onerror = () => reject(transaction.error); }; }); setVoskPack({ status: "ready", name: "English (US) · small", size: "40 MB", downloadedAt: new Date().toISOString() }); showToast("Offline language pack downloaded locally"); } catch { setVoskPack((previous) => ({ ...previous, status: "not-installed" })); showToast("Language pack could not be downloaded"); } };
   const removeVoskPack = () => { try { const request = indexedDB.open("lycon-voice-packs", 1); request.onsuccess = () => request.result.transaction("packs", "readwrite").objectStore("packs").delete("vosk-small-en-us"); } catch { /* IndexedDB can be unavailable in restricted contexts */ } setVoskPack({ status: "not-installed", name: "English (US) · small", size: "40 MB" }); showToast("Offline language pack removed"); };
   const openSettingsSection = (section: SettingsSection) => { setSettingsSection(section); navigateTo({ title: "Settings", url: "lycon://settings", kind: "local", view: "settings" }); };
@@ -531,10 +652,10 @@ export default function Home() {
     return () => document.removeEventListener("pointerdown", handleOutsidePointer);
   }, [overflowOpen]);
 
-  const moveTab = (tabId: number, targetIndex: number) => setTabs((previous) => { const currentIndex = previous.findIndex((tab) => tab.id === tabId); if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previous.length || currentIndex === targetIndex) return previous; const next = [...previous]; const [moved] = next.splice(currentIndex, 1); next.splice(targetIndex, 0, moved); return next; });
-  const reorderTab = (tabId: number, targetId: number) => { const targetIndex = tabs.findIndex((tab) => tab.id === targetId); moveTab(tabId, targetIndex); setDraggingTabId(null); };
-  const handleTabPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: number) => { if (event.button !== 0) return; const touch = event.pointerType !== "mouse"; tabPointerRef.current = { id: tabId, moved: false, touch }; if (touch) { setPressingTabId(tabId); tabLongPressRef.current = window.setTimeout(() => { setDraggingTabId(tabId); if ("vibrate" in navigator) navigator.vibrate?.(18); }, 420); } event.currentTarget.setPointerCapture?.(event.pointerId); };
-  const handleTabPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => { const pointer = tabPointerRef.current; if (!pointer) return; if (Math.abs(event.movementX) + Math.abs(event.movementY) > 3) { pointer.moved = true; if (pointer.touch && draggingTabId === pointer.id) suppressTabClickRef.current = true; } if (pointer.touch && draggingTabId !== pointer.id) return; if (!pointer.moved) return; setPressingTabId(null); setDraggingTabId(pointer.id); const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tab-id]"); const targetId = element ? Number(element.dataset.tabId) : null; if (targetId && targetId !== pointer.id) reorderTab(pointer.id, targetId); };
+  const moveTab = (tabId: TabId, targetIndex: number) => setTabs((previous) => { const currentIndex = previous.findIndex((tab) => tab.id === tabId); if (currentIndex < 0 || targetIndex < 0 || targetIndex >= previous.length || currentIndex === targetIndex) return previous; const next = [...previous]; const [moved] = next.splice(currentIndex, 1); next.splice(targetIndex, 0, moved); return next; });
+  const reorderTab = (tabId: TabId, targetId: TabId) => { const targetIndex = tabs.findIndex((tab) => tab.id === targetId); moveTab(tabId, targetIndex); setDraggingTabId(null); };
+  const handleTabPointerDown = (event: React.PointerEvent<HTMLButtonElement>, tabId: TabId) => { if (event.button !== 0) return; const touch = event.pointerType !== "mouse"; tabPointerRef.current = { id: tabId, moved: false, touch }; if (touch) { setPressingTabId(tabId); tabLongPressRef.current = window.setTimeout(() => { setDraggingTabId(tabId); if ("vibrate" in navigator) navigator.vibrate?.(18); }, 420); } event.currentTarget.setPointerCapture?.(event.pointerId); };
+  const handleTabPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => { const pointer = tabPointerRef.current; if (!pointer) return; if (Math.abs(event.movementX) + Math.abs(event.movementY) > 3) { pointer.moved = true; if (pointer.touch && draggingTabId === pointer.id) suppressTabClickRef.current = true; } if (pointer.touch && draggingTabId !== pointer.id) return; if (!pointer.moved) return; setPressingTabId(null); setDraggingTabId(pointer.id); const element = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-tab-id]"); const targetId = element ? (element.dataset.tabId as TabId) : null; if (targetId && targetId !== pointer.id) reorderTab(pointer.id, targetId); };
   const handleTabPointerUp = () => { if (tabLongPressRef.current) window.clearTimeout(tabLongPressRef.current); tabLongPressRef.current = null; tabPointerRef.current = null; setPressingTabId(null); setDraggingTabId(null); };
 
   useEffect(() => {
@@ -543,7 +664,7 @@ export default function Home() {
       const key = event.key.toLowerCase();
       if (key === "t") { event.preventDefault(); newTab(); }
       else if (key === "n" && event.shiftKey) { event.preventDefault(); newPrivateTab(); }
-      else if (key === "w") { event.preventDefault(); closeTab(activeTabId); }
+      else if (key === "w") { event.preventDefault(); closeLocalTab(activeTabId); }
       else if (key === "l") { event.preventDefault(); addressInputRef.current?.focus(); addressInputRef.current?.select(); }
       else if (key === "f") { event.preventDefault(); findOnPage(); }
       else if (key === "p") { event.preventDefault(); printCurrentPage(); }
@@ -554,6 +675,21 @@ export default function Home() {
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [activeTabId, tabs.length]);
+
+  const selectTab = async (tab: Tab) => {
+    const page = tab.history[tab.historyIndex] ?? tab.history[0];
+    if (coreState.isReady && coreState.activeTabId) {
+      if (coreState.activeTabId !== tab.id) {
+        const events = await activateTab(tab.id);
+        if (!events.some((event) => event.type === "TabActivated")) return;
+      }
+    }
+    if (!page) return;
+    setCurrentView(page.view ?? "online");
+    setActivePage(page);
+    setAddress(addressForPage(page));
+    setOnlineOpened(page.kind === "online");
+  };
 
   const requestClearBrowsingData = () => setConfirmAction({ title: "Clear browsing data?", copy: "This removes local history and downloaded document records from Lycon. Saved pages and settings stay untouched.", confirmLabel: "Clear local data", onConfirm: clearBrowsingData });
   const requestRemoveBookmark = (id: string) => { const item = bookmarks.find((bookmark) => bookmark.id === id); if (!item) return; setConfirmAction({ title: "Delete saved page?", copy: `Remove “${item.title}” from your local saved pages? This cannot be undone from Lycon.`, confirmLabel: "Delete saved page", onConfirm: () => { setBookmarks((previous) => previous.filter((bookmark) => bookmark.id !== id)); showToast("Saved page deleted"); } }); };
@@ -566,14 +702,14 @@ export default function Home() {
         <div className="tab-strip">
           <button className="home-mark" onClick={() => navigateView("start")} aria-label="Home"><img src="/assets/lycon-logo.png" alt="" /></button>
           <div className="tabs">
-            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""} ${pressingTabId === tab.id ? "long-pressing" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={() => { if (suppressTabClickRef.current) { suppressTabClickRef.current = false; return; } setActiveTabId(tab.id); const page = tab.history[tab.historyIndex]; setCurrentView(page.view ?? "online"); setActivePage(page); setAddress(addressForPage(page)); }}><span className="tab-signal" /> <CachedFavicon className="tab-favicon" src={tab.favicon ?? tab.history[tab.historyIndex]?.favicon ?? (tab.history[tab.historyIndex]?.kind === "online" ? `https://${new URL(tab.history[tab.historyIndex]?.url ?? "https://example.com").hostname}/favicon.ico` : "/assets/lycon-logo.png")} /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
+            {tabs.map((tab) => <button key={tab.id} data-tab-id={tab.id} className={`tab ${tab.id === activeTabId ? "active" : ""} ${draggingTabId === tab.id ? "dragging" : ""} ${pressingTabId === tab.id ? "long-pressing" : ""}`} draggable onDragStart={() => setDraggingTabId(tab.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => draggingTabId !== null && reorderTab(draggingTabId, tab.id)} onDragEnd={() => setDraggingTabId(null)} onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove} onPointerUp={handleTabPointerUp} onPointerCancel={handleTabPointerUp} onKeyDown={(event) => { if (!event.altKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return; event.preventDefault(); const index = tabs.findIndex((item) => item.id === tab.id); moveTab(tab.id, event.key === "ArrowLeft" ? index - 1 : index + 1); }} aria-grabbed={draggingTabId === tab.id} onClick={async () => { if (suppressTabClickRef.current) { suppressTabClickRef.current = false; return; } await selectTab(tab); }}><span className="tab-signal" /> <CachedFavicon className="tab-favicon" src={tab.favicon ?? tab.history[tab.historyIndex]?.favicon ?? (tab.history[tab.historyIndex]?.kind === "online" ? `https://${new URL(tab.history[tab.historyIndex]?.url ?? "https://example.com").hostname}/favicon.ico` : "/assets/lycon-logo.png")} /> <span className="tab-title">{tab.isPrivate ? "Private · " : ""}{tab.title}</span><span className="tab-close" onClick={(event) => { event.stopPropagation(); closeLocalTab(tab.id); }} role="button" aria-label={`Close ${tab.title}`}><X size={13} /></span></button>)}
           </div>
           <button className="new-tab" onClick={newTab} aria-label="New tab"><Plus size={17} /></button>
-          <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
+          <div ref={overflowShellRef} className="window-actions"><button ref={overflowButtonRef} className={`icon-btn ${overflowOpen ? "active" : ""}`} onClick={() => setOverflowOpen((open) => !open)} aria-label="More browser actions" aria-expanded={overflowOpen}><MoreHorizontal size={17} /></button>{overflowOpen ? <OverflowMenu onNavigate={navigateView} onSettings={openSettingsSection} onClearData={requestClearBrowsingData} onNewTab={newTab} onNewWindow={openNewWindow} onNewPrivateTab={newPrivateTab} onCloseTab={() => closeLocalTab(activeTabId)} onClose={() => { setOverflowOpen(false); window.setTimeout(() => overflowButtonRef.current?.focus(), 0); }} onScreenshot={captureLocalScreenshot} screenshotBusy={screenshotBusy} onToggleSplitView={() => { setSplitViewOpen((value) => !value); setOverflowOpen(false); }} splitViewOpen={splitViewOpen} zoomLevel={zoomLevel} onZoomIn={() => changeZoom(10)} onZoomOut={() => changeZoom(-10)} onZoomReset={resetZoom} onPrint={printCurrentPage} onFind={findOnPage} onUnsupported={showUnsupported} /> : null}</div>
         </div>
         <div className="toolbar tablet-compact-toolbar">
-          <button className="icon-btn" onClick={navigateBack} disabled={!activeTab || activeTab.historyIndex <= 0} aria-label="Back"><ArrowLeft size={17} /></button>
-          <button className="icon-btn" onClick={navigateForward} disabled={!activeTab || activeTab.historyIndex >= activeTab.history.length - 1} aria-label="Forward"><ArrowRight size={17} /></button>
+          <button className="icon-btn" onClick={navigateBack} disabled={!activeTab} aria-label="Back"><ArrowLeft size={17} /></button>
+          <button className="icon-btn" onClick={navigateForward} disabled={!activeTab} aria-label="Forward"><ArrowRight size={17} /></button>
           <button className="icon-btn" onClick={() => showToast("Local page refreshed")} aria-label="Reload local page"><RotateCw size={16} /></button>
           <form className="address-wrap" onSubmit={submitAddress}>
             {activeTab?.isPrivate ? <EyeOff size={15} className="private-ink" /> : <LockKeyhole size={14} className={activePage.kind === "local" ? "local-ink" : "online-ink"} />}
@@ -583,7 +719,7 @@ export default function Home() {
           </form>
           <div className={`console-signal signal-${shellState}`}><span className="console-signal-dot" /><span>{shellState === "private" ? "PRIVATE" : shellState === "online" ? "HANDOFF" : "LOCAL"}</span></div><SyncStatusIndicator enabled={settings.syncEnabled === true} status={syncStatus} />
           <button className={`icon-btn ${isBookmarked ? "active" : ""}`} onClick={toggleBookmark} disabled={!activeTab || activePage.view === "start"} aria-label={isBookmarked ? "Remove bookmark" : "Save bookmark"}><Bookmark size={17} fill={isBookmarked ? "currentColor" : "none"} /></button>
-          <button className={`icon-btn ${settings.shieldsEnabled ? "active" : ""}`} onClick={() => updateSetting("shieldsEnabled", !settings.shieldsEnabled)} aria-label="Toggle shields"><ShieldCheck size={17} /></button>
+          <button className={`icon-btn ${settings.shieldsEnabled ? "active" : ""}`} onClick={() => toggleShields()} aria-label="Toggle shields"><ShieldCheck size={17} /></button>
           <button className="icon-btn" onClick={togglePrivate} aria-label="Toggle private mode"><EyeOff size={17} /></button>
         </div>
 
@@ -594,8 +730,8 @@ export default function Home() {
           {currentView === "bookmarks" && <BookmarksView bookmarks={bookmarks} onOpen={(item) => navigateTo(createDestination(item.url))} onRemove={requestRemoveBookmark} />}
           {currentView === "history" && <HistoryView entries={historyEntries} onOpen={(entry) => navigateTo(createDestination(entry.url))} onClear={() => setConfirmAction({ title: "Clear history?", copy: "Remove every local visit from Lycon’s browsing history? Downloaded documents will remain.", confirmLabel: "Clear history", onConfirm: () => { setHistoryEntries([]); showToast("History cleared"); } })} />}
           {currentView === "downloads" && <DownloadsView downloads={downloads} onPick={() => fileInput.current?.click()} />}
-          {currentView === "settings" && <SettingsView settings={settings} section={settingsSection} setSection={setSettingsSection} updateSetting={updateSetting} tabs={tabs} voskPack={voskPack} onInstallVosk={installVoskPack} onRemoveVosk={removeVoskPack} onExport={exportLocalData} onImport={() => backupInput.current?.click()} isAuthenticated={isAuthenticated} syncStatus={syncStatus} onSignIn={startLogin} />}
-          {currentView === "online" && <OnlineView page={activePage} onlineOpened={onlineOpened} onOpen={() => setOnlineOpened(true)} onBack={() => navigateView("start")} />}
+          {currentView === "settings" && <SettingsView settings={settings} section={settingsSection} setSection={setSettingsSection} updateSetting={updateSetting} tabs={tabs} voskPack={voskPack} onInstallVosk={installVoskPack} onRemoveVosk={removeVoskPack} onExport={exportLocalData} onImport={() => backupInput.current?.click()} isAuthenticated={isAuthenticated} syncStatus={syncStatus} onSignIn={startLogin} onShieldsChange={(checked) => toggleShields(checked)} />}
+          {currentView === "online" && <OnlineView page={activePage} onlineOpened={onlineOpened} onOpen={openOnlinePage} onBack={() => navigateView("start")} coreContainerRef={coreContainerRef} />}
           </div>
           {splitViewOpen ? <aside className="split-pane" aria-label="Lycon split screen"><div className="split-pane-heading"><span>LOCAL PANE</span><button className="icon-btn" onClick={() => setSplitViewOpen(false)} aria-label="Close split screen"><X size={14} /></button></div><strong>Keep a second surface close.</strong><p>Use this local pane for quick access while you browse.</p><div className="split-pane-actions"><button className="secondary-btn" onClick={() => navigateView("start")}><HomeIcon size={14} /> Start</button><button className="secondary-btn" onClick={() => navigateView("bookmarks")}><Bookmark size={14} /> Favorites</button><button className="secondary-btn" onClick={() => navigateView("history")}><History size={14} /> History</button></div></aside> : null}
         </div>
@@ -753,10 +889,10 @@ function OverflowMenu({ onNavigate, onSettings, onClearData, onNewTab, onNewWind
   return <div ref={menuRef} className="overflow-menu" role="menu" aria-label="Browser application menu"><div className="overflow-heading">LYCON MENU <span>Browser controls · Esc to close</span></div>{item("New tab", <Plus size={15} />, onNewTab, "Ctrl+T")}{item("New window", <AppWindow size={15} />, onNewWindow, "Ctrl+N")}{item("New private tab", <EyeOff size={15} />, onNewPrivateTab, "Ctrl+Shift+N")}<div className="menu-zoom-row"><button onClick={onZoomOut} aria-label="Zoom out"><Minus size={14} /></button><button onClick={onZoomReset}>{zoomLevel}%</button><button onClick={onZoomIn} aria-label="Zoom in"><Plus size={14} /></button></div><div className="overflow-divider" />{item("Favorites", <Bookmark size={15} />, () => onNavigate("bookmarks"), "Ctrl+Shift+O")}{item("History", <History size={15} />, () => onNavigate("history"), "Ctrl+H")}{item("Downloads", <Download size={15} />, () => onNavigate("downloads"), "Ctrl+J")}{item("Tab groups", <Layers3 size={15} />, () => onSettings("tabs"), "›")}{item("Extensions", <Puzzle size={15} />, () => onSettings("extensions"), "›")}{item("Passwords", <KeyRound size={15} />, () => onSettings("passwords"), "›")}<div className="overflow-divider" />{item("Delete browsing data", <Trash2 size={15} />, onClearData, "Ctrl+Shift+Delete", "danger-item")}{item("Print", <Printer size={15} />, onPrint, "Ctrl+P")}{item("Translate", <Languages size={15} />, () => onSettings("translate"))}{item(splitViewOpen ? "Close split screen" : "Split screen", <Layers3 size={15} />, onToggleSplitView)}{item(screenshotBusy ? "Capturing snapshot…" : "Screenshot", <Camera size={15} />, onScreenshot, "Ctrl+Shift+S")}{item("Find on page", <Search size={15} />, onFind, "Ctrl+F")}{item("More tools", <MoreHorizontal size={15} />, () => onSettings("tools"), "›")}<div className="overflow-divider" />{item("Settings", <Settings size={15} />, () => onSettings("appearance"))}{item("Help and feedback", <HelpCircle size={15} />, () => onSettings("help"), "›")}{item("Close tab", <X size={15} />, onCloseTab)}</div>;
 }
 
-function SettingsView({ settings, section, setSection, updateSetting, tabs, voskPack, onInstallVosk, onRemoveVosk, onExport, onImport, isAuthenticated, syncStatus, onSignIn }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void; tabs: Tab[]; voskPack: VoskPackState; onInstallVosk: () => void; onRemoveVosk: () => void; onExport: () => void; onImport: () => void; isAuthenticated: boolean; syncStatus: string; onSignIn: () => void }) {
+function SettingsView({ settings, section, setSection, updateSetting, tabs, voskPack, onInstallVosk, onRemoveVosk, onExport, onImport, isAuthenticated, syncStatus, onSignIn, onShieldsChange }: { settings: SettingsState; section: SettingsSection; setSection: (section: SettingsSection) => void; updateSetting: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void; tabs: Tab[]; voskPack: VoskPackState; onInstallVosk: () => void; onRemoveVosk: () => void; onExport: () => void; onImport: () => void; isAuthenticated: boolean; syncStatus: string; onSignIn: () => void; onShieldsChange: (checked: boolean) => void }) {
   const voiceMode = settings.voiceMode ?? "online";
   const settingNav: Array<{ id: SettingsSection; label: string; icon: LucideIcon }> = [{ id: "appearance", label: "Appearance", icon: Palette }, { id: "privacy", label: "Privacy", icon: ShieldCheck }, { id: "permissions", label: "Permissions", icon: LockKeyhole }, { id: "voice", label: "Voice", icon: Mic }, { id: "search", label: "Search", icon: Search }, { id: "tabs", label: "Tabs", icon: Layers3 }, { id: "extensions", label: "Extensions", icon: Puzzle }, { id: "passwords", label: "Passwords", icon: KeyRound }, { id: "translate", label: "Translate", icon: Languages }, { id: "tools", label: "More tools", icon: MoreHorizontal }, { id: "help", label: "Help", icon: HelpCircle }];
-  return <div className="page settings-page"><PageHeading eyebrow="CONTROL ROOM / SETTINGS" title="Settings" description="Keep the browser’s posture in your hands." /><div className="settings-layout"><div className="settings-nav">{settingNav.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</div><div className="settings-card">{section === "appearance" && <><SettingHeader title="Appearance" copy="Choose how the field looks when you return." /><SettingToggle label="Dark mode" copy={settings.theme === "dark" ? "Night watch is active across Lycon." : "Use the lighter day-field palette for this device."} checked={settings.theme === "dark"} onChange={(checked) => updateSetting("theme", checked ? "dark" : "light")} /><SettingSelect label="Startup view" value={settings.startupView} options={[{ value: "start", label: "Start page" }, { value: "last", label: "Last active view" }]} onChange={(value) => updateSetting("startupView", value as "start" | "last")} /></>}{section === "privacy" && <><SettingHeader title="Privacy" copy="Make the local boundary visible and easy to adjust." /><SettingToggle label="Shields" copy="Keep known trackers and noisy requests at a distance." checked={settings.shieldsEnabled} onChange={(checked) => updateSetting("shieldsEnabled", checked)} /><SettingToggle label="Private tabs" copy="Keep this session out of the standard local trace." checked={activeBoolean(false)} onChange={() => undefined} /><div className="sync-card"><div><strong>Account sync</strong><p>Optional account storage for browser metadata. Local data remains active and is never replaced silently.</p></div><span className="sync-status" aria-live="polite">{syncStatus}</span><div className="backup-actions">{isAuthenticated ? <SettingToggle label="Sync my browser data" copy="Bookmarks, history, tabs, settings, and download metadata." checked={settings.syncEnabled === true} onChange={(checked) => updateSetting("syncEnabled", checked)} /> : <button className="primary-btn" type="button" onClick={onSignIn}>Sign in to enable sync</button>}</div></div></>}{section === "permissions" && <><SettingHeader title="Site permissions" copy="Keep microphone and location requests explicit." /><SettingSelect label="Microphone" value={settings.microphonePermission} options={[{ value: "ask", label: "Ask every time" }, { value: "allow", label: "Allow" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("microphonePermission", value as SettingsState["microphonePermission"])} /><SettingSelect label="Location" value={settings.locationPermission} options={[{ value: "ask", label: "Ask every time" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("locationPermission", value as SettingsState["locationPermission"])} /></>}{section === "voice" && <><SettingHeader title="Voice input" copy="Choose how Lycon turns speech into local search or addresses." /><SettingSelect label="Recognition mode" value={voiceMode} options={[{ value: "online", label: "Online browser recognition" }, { value: "on-device", label: "On-device browser recognition" }, { value: "vosk", label: "Offline Vosk language pack" }]} onChange={(value) => updateSetting("voiceMode", value as VoiceMode)} /><SettingSelect label="Voice language" value={settings.voiceLanguage ?? "en-ZA"} options={[{ value: "en-ZA", label: "English (South Africa)" }, { value: "en-US", label: "English (United States)" }, { value: "en-GB", label: "English (United Kingdom)" }, { value: "af-ZA", label: "Afrikaans (South Africa)" }]} onChange={(value) => updateSetting("voiceLanguage", value)} /><div className="setting-note"><Mic size={16} /><div><strong>{voiceMode === "online" ? "Online mode" : voiceMode === "on-device" ? "On-device mode" : "Offline pack mode"}</strong><p>{voiceMode === "online" ? "Uses the browser’s configured recognition service when you press the microphone." : voiceMode === "on-device" ? "Requests the browser’s local recognition path when its language pack is available." : "Keeps an optional Vosk model in this device’s IndexedDB; the model is never bundled into the initial app."}</p></div></div><VoiceTestPhrase language={settings.voiceLanguage ?? "en-ZA"} processLocally={voiceMode !== "online"} /><div className="voice-catalog"><div className="voice-catalog-heading"><strong>Offline language catalog</strong><span>Optional packs stay outside the base app.</span></div>{voskCatalog.map((pack) => <div className="voice-catalog-row" key={pack.id}><div><strong>{pack.label}</strong><small>{pack.code} · {pack.size}</small></div><span>{pack.status === "profile" ? "Browser profile" : voskPack.status === "ready" ? "Installed" : "Download below"}</span></div>)}</div><div className="backup-card voice-pack-card"><div className="backup-card-heading"><Download size={16} /><div><strong>{voskPack.name}</strong><p>{voskPack.status === "ready" ? `Stored locally · ${voskPack.size}` : `${voskPack.size} download · optional offline vocabulary pack`}</p></div></div>{voskPack.status === "ready" ? <div className="backup-actions"><span className="pack-ready"><Check size={14} /> Ready on this device</span><button className="secondary-btn" onClick={onRemoveVosk}>Remove pack</button></div> : <button className="primary-btn" onClick={onInstallVosk} disabled={voskPack.status === "downloading"}>{voskPack.status === "downloading" ? "Downloading…" : "Download offline pack"}</button>}</div></>}{section === "search" && <><SettingHeader title="Search" copy="Lycon Search indexes this workspace directly. Ordinary queries never leave the app." /><div className="setting-note"><Search size={16} /><div><strong>Native Lycon Search</strong><p>Local pages, saved content, history, downloads, and settings stay in Lycon’s own index.</p></div></div><div className="backup-card"><div className="backup-card-heading"><FileJson size={16} /><div><strong>Local backup</strong><p>Export or restore bookmarks and the local search index without sending data away.</p></div></div><div className="backup-actions"><button className="secondary-btn" onClick={onExport}><Download size={14} /> Export JSON</button><button className="primary-btn" onClick={onImport}><Upload size={14} /> Import JSON</button></div></div></>}{section === "tabs" && <><SettingHeader title="Tabs and windows" copy="Keep work separated without leaving the Lycon shell." /><div className="setting-note"><Layers3 size={16} /><div><strong>{tabs.length} open {tabs.length === 1 ? "tab" : "tabs"}</strong><p>New tabs and private tabs stay inside Lycon. New window opens another Lycon workspace when the browser allows it.</p></div></div></>}{section === "extensions" && <><SettingHeader title="Extensions" copy="A safe place for local browser add-ons when this capability is enabled." /><div className="setting-note"><Puzzle size={16} /><div><strong>No extensions installed</strong><p>Lycon’s static shell does not execute third-party extensions. This surface is reserved for signed, local add-ons.</p></div></div></>}{section === "passwords" && <><SettingHeader title="Passwords" copy="Keep credentials out of Lycon until secure encrypted storage is available." /><div className="setting-note"><KeyRound size={16} /><div><strong>Managed by your device</strong><p>Lycon does not collect, sync, or store passwords in localStorage.</p></div></div></>}{section === "translate" && <><SettingHeader title="Translate" copy="Choose a preferred reading language for future translation support." /><SettingSelect label="Preferred language" value="system" options={[{ value: "system", label: "Use device language" }, { value: "en", label: "English" }, { value: "zu", label: "isiZulu" }, { value: "af", label: "Afrikaans" }]} onChange={() => undefined} /><div className="setting-note"><Languages size={16} /><div><strong>Translation stays deliberate</strong><p>Lycon will never send page text to a translation service without an explicit handoff.</p></div></div></>}{section === "tools" && <><SettingHeader title="More tools" copy="Utilities that help you inspect, capture, and organize this workspace." /><div className="setting-note"><MoreHorizontal size={16} /><div><strong>Local tools are ready</strong><p>Use Find on page, Screenshot, Print, Split screen, local backups, and the downloads index from the application menu.</p></div></div></>}{section === "help" && <><SettingHeader title="Help and feedback" copy="Understand Lycon’s boundaries and keep the browser useful." /><div className="setting-note"><HelpCircle size={16} /><div><strong>Lycon is local by default</strong><p>Local pages, history, bookmarks, and indexed documents remain in this browser profile. Online pages are deliberate embedded handoffs.</p></div></div></>}</div></div></div>;
+  return <div className="page settings-page"><PageHeading eyebrow="CONTROL ROOM / SETTINGS" title="Settings" description="Keep the browser’s posture in your hands." /><div className="settings-layout"><div className="settings-nav">{settingNav.map(({ id, label, icon: Icon }) => <button className={section === id ? "active" : ""} key={id} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</div><div className="settings-card">{section === "appearance" && <><SettingHeader title="Appearance" copy="Choose how the field looks when you return." /><SettingToggle label="Dark mode" copy={settings.theme === "dark" ? "Night watch is active across Lycon." : "Use the lighter day-field palette for this device."} checked={settings.theme === "dark"} onChange={(checked) => updateSetting("theme", checked ? "dark" : "light")} /><SettingSelect label="Startup view" value={settings.startupView} options={[{ value: "start", label: "Start page" }, { value: "last", label: "Last active view" }]} onChange={(value) => updateSetting("startupView", value as "start" | "last")} /></>}{section === "privacy" && <><SettingHeader title="Privacy" copy="Make the local boundary visible and easy to adjust." /><SettingToggle label="Shields" copy="Keep the boundary sealed: online pages load only after a deliberate handoff inside Lycon, at the navigation level, and close again when shields are on." checked={settings.shieldsEnabled} onChange={onShieldsChange} /><SettingToggle label="Private tabs" copy="Keep this session out of the standard local trace." checked={activeBoolean(false)} onChange={() => undefined} /><div className="sync-card"><div><strong>Account sync</strong><p>Optional account storage for browser metadata. Local data remains active and is never replaced silently.</p></div><span className="sync-status" aria-live="polite">{syncStatus}</span><div className="backup-actions">{isAuthenticated ? <SettingToggle label="Sync my browser data" copy="Bookmarks, history, tabs, settings, and download metadata." checked={settings.syncEnabled === true} onChange={(checked) => updateSetting("syncEnabled", checked)} /> : <button className="primary-btn" type="button" onClick={onSignIn}>Sign in to enable sync</button>}</div></div></>}{section === "permissions" && <><SettingHeader title="Site permissions" copy="Keep microphone and location requests explicit." /><SettingSelect label="Microphone" value={settings.microphonePermission} options={[{ value: "ask", label: "Ask every time" }, { value: "allow", label: "Allow" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("microphonePermission", value as SettingsState["microphonePermission"])} /><SettingSelect label="Location" value={settings.locationPermission} options={[{ value: "ask", label: "Ask every time" }, { value: "block", label: "Block" }]} onChange={(value) => updateSetting("locationPermission", value as SettingsState["locationPermission"])} /></>}{section === "voice" && <><SettingHeader title="Voice input" copy="Choose how Lycon turns speech into local search or addresses." /><SettingSelect label="Recognition mode" value={voiceMode} options={[{ value: "online", label: "Online browser recognition" }, { value: "on-device", label: "On-device browser recognition" }, { value: "vosk", label: "Offline Vosk language pack" }]} onChange={(value) => updateSetting("voiceMode", value as VoiceMode)} /><SettingSelect label="Voice language" value={settings.voiceLanguage ?? "en-ZA"} options={[{ value: "en-ZA", label: "English (South Africa)" }, { value: "en-US", label: "English (United States)" }, { value: "en-GB", label: "English (United Kingdom)" }, { value: "af-ZA", label: "Afrikaans (South Africa)" }]} onChange={(value) => updateSetting("voiceLanguage", value)} /><div className="setting-note"><Mic size={16} /><div><strong>{voiceMode === "online" ? "Online mode" : voiceMode === "on-device" ? "On-device mode" : "Offline pack mode"}</strong><p>{voiceMode === "online" ? "Uses the browser’s configured recognition service when you press the microphone." : voiceMode === "on-device" ? "Requests the browser’s local recognition path when its language pack is available." : "Keeps an optional Vosk model in this device’s IndexedDB; the model is never bundled into the initial app."}</p></div></div><VoiceTestPhrase language={settings.voiceLanguage ?? "en-ZA"} processLocally={voiceMode !== "online"} /><div className="voice-catalog"><div className="voice-catalog-heading"><strong>Offline language catalog</strong><span>Optional packs stay outside the base app.</span></div>{voskCatalog.map((pack) => <div className="voice-catalog-row" key={pack.id}><div><strong>{pack.label}</strong><small>{pack.code} · {pack.size}</small></div><span>{pack.status === "profile" ? "Browser profile" : voskPack.status === "ready" ? "Installed" : "Download below"}</span></div>)}</div><div className="backup-card voice-pack-card"><div className="backup-card-heading"><Download size={16} /><div><strong>{voskPack.name}</strong><p>{voskPack.status === "ready" ? `Stored locally · ${voskPack.size}` : `${voskPack.size} download · optional offline vocabulary pack`}</p></div></div>{voskPack.status === "ready" ? <div className="backup-actions"><span className="pack-ready"><Check size={14} /> Ready on this device</span><button className="secondary-btn" onClick={onRemoveVosk}>Remove pack</button></div> : <button className="primary-btn" onClick={onInstallVosk} disabled={voskPack.status === "downloading"}>{voskPack.status === "downloading" ? "Downloading…" : "Download offline pack"}</button>}</div></>}{section === "search" && <><SettingHeader title="Search" copy="Lycon Search indexes this workspace directly. Ordinary queries never leave the app." /><div className="setting-note"><Search size={16} /><div><strong>Native Lycon Search</strong><p>Local pages, saved content, history, downloads, and settings stay in Lycon’s own index.</p></div></div><div className="backup-card"><div className="backup-card-heading"><FileJson size={16} /><div><strong>Local backup</strong><p>Export or restore bookmarks and the local search index without sending data away.</p></div></div><div className="backup-actions"><button className="secondary-btn" onClick={onExport}><Download size={14} /> Export JSON</button><button className="primary-btn" onClick={onImport}><Upload size={14} /> Import JSON</button></div></div></>}{section === "tabs" && <><SettingHeader title="Tabs and windows" copy="Keep work separated without leaving the Lycon shell." /><div className="setting-note"><Layers3 size={16} /><div><strong>{tabs.length} open {tabs.length === 1 ? "tab" : "tabs"}</strong><p>New tabs and private tabs stay inside Lycon. New window opens another Lycon workspace when the browser allows it.</p></div></div></>}{section === "extensions" && <><SettingHeader title="Extensions" copy="A safe place for local browser add-ons when this capability is enabled." /><div className="setting-note"><Puzzle size={16} /><div><strong>No extensions installed</strong><p>Lycon’s static shell does not execute third-party extensions. This surface is reserved for signed, local add-ons.</p></div></div></>}{section === "passwords" && <><SettingHeader title="Passwords" copy="Keep credentials out of Lycon until secure encrypted storage is available." /><div className="setting-note"><KeyRound size={16} /><div><strong>Managed by your device</strong><p>Lycon does not collect, sync, or store passwords in localStorage.</p></div></div></>}{section === "translate" && <><SettingHeader title="Translate" copy="Choose a preferred reading language for future translation support." /><SettingSelect label="Preferred language" value="system" options={[{ value: "system", label: "Use device language" }, { value: "en", label: "English" }, { value: "zu", label: "isiZulu" }, { value: "af", label: "Afrikaans" }]} onChange={() => undefined} /><div className="setting-note"><Languages size={16} /><div><strong>Translation stays deliberate</strong><p>Lycon will never send page text to a translation service without an explicit handoff.</p></div></div></>}{section === "tools" && <><SettingHeader title="More tools" copy="Utilities that help you inspect, capture, and organize this workspace." /><div className="setting-note"><MoreHorizontal size={16} /><div><strong>Local tools are ready</strong><p>Use Find on page, Screenshot, Print, Split screen, local backups, and the downloads index from the application menu.</p></div></div></>}{section === "help" && <><SettingHeader title="Help and feedback" copy="Understand Lycon’s boundaries and keep the browser useful." /><div className="setting-note"><HelpCircle size={16} /><div><strong>Lycon is local by default</strong><p>Local pages, history, bookmarks, and indexed documents remain in this browser profile. Online pages are deliberate embedded handoffs.</p></div></div></>}</div></div></div>;
 }
 
 function activeBoolean(value: boolean) { return value; }
@@ -771,11 +907,20 @@ function SettingHeader({ title, copy }: { title: string; copy: string }) { retur
 function SettingSelect({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) { return <label className="setting-control"><span>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>; }
 function SettingToggle({ label, copy, checked, onChange }: { label: string; copy: string; checked: boolean; onChange: (checked: boolean) => void }) { return <div className="setting-toggle"><div><strong>{label}</strong><p>{copy}</p></div><button className={`toggle ${checked ? "on" : ""}`} onClick={() => onChange(!checked)} role="switch" aria-checked={checked}><span /></button></div>; }
 
-function OnlineView({ page, onlineOpened, onOpen, onBack }: { page: PageRecord; onlineOpened: boolean; onOpen: () => void; onBack: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const [blocked, setBlocked] = useState(false);
-  useEffect(() => { if (!onlineOpened) { setLoading(false); setBlocked(false); return; } setLoading(true); setBlocked(false); const timeout = window.setTimeout(() => { setLoading(false); setBlocked(true); }, 9000); return () => window.clearTimeout(timeout); }, [onlineOpened, page.url]);
-  return <div className={`page online-page ${onlineOpened ? "online-page-open" : ""}`}>{onlineOpened ? <div className="embedded-browser"><div className="embedded-label"><span className={`status-dot ${loading ? "status-pulse" : ""}`} /> {loading ? "Connecting inside Lycon" : blocked ? "Embedded page unavailable" : "Rendering inside Lycon"}</div>{loading ? <div className="load-progress" role="progressbar" aria-label="Loading embedded page"><span /></div> : null}{blocked ? <div className="embed-fallback"><WifiOff size={19} /><strong>This site did not allow an embedded view.</strong><p>Lycon kept the request inside this workspace and did not open another browser.</p><button className="secondary-btn" onClick={onBack}><HomeIcon size={14} /> Return to local</button></div> : <iframe title={`Lycon view of ${page.title}`} src={page.url} referrerPolicy="no-referrer" sandbox="allow-forms allow-modals allow-popups allow-presentation allow-scripts" onLoad={() => setLoading(false)} onError={() => { setLoading(false); setBlocked(true); }} />}</div> : <><div className="online-visual"><Globe2 size={26} /></div><div className="eyebrow">INTENTIONAL HANDOFF / ONLINE</div><h1>The wild starts here.</h1><p>This address belongs to the wider web. Lycon keeps it inside this workspace until you say go.</p><div className="online-status"><span className="status-dot" /> Online available</div><div className="handoff-card"><div className="handoff-url"><LockKeyhole size={14} /> {page.url}</div><div className="handoff-actions"><button className="primary-btn" onClick={onOpen}><ExternalLink size={15} /> Open inside Lycon</button><button className="secondary-btn" onClick={onBack}><HomeIcon size={14} /> Return to local</button></div><small className="handoff-note">Some sites may restrict embedded rendering. Lycon will never open an external browser window.</small></div></>}</div>;
+function OnlineView({ page, onlineOpened, onOpen, onBack, coreContainerRef }: { page: PageRecord; onlineOpened: boolean; onOpen: () => void; onBack: () => void; coreContainerRef: React.RefObject<HTMLDivElement | null> }) {
+  const [loading, setLoading] = useState(true);
+  // Loading reflects the REAL engine surface: it resolves when an iframe inside
+  // the bound container fires `load` (capture phase). No fake timeouts.
+  useEffect(() => {
+    if (!onlineOpened) { setLoading(true); return; }
+    const container = coreContainerRef.current;
+    if (!container) { setLoading(true); return; }
+    const markLoaded = () => setLoading(false);
+    setLoading(true);
+    container.addEventListener("load", markLoaded, true);
+    return () => container.removeEventListener("load", markLoaded, true);
+  }, [onlineOpened, page.url, coreContainerRef]);
+  return <div className={`page online-page ${onlineOpened ? "online-page-open" : ""}`}>{onlineOpened ? <div className="embedded-browser"><div className="embedded-label"><span className={`status-dot ${loading ? "status-pulse" : ""}`} /> {loading ? "Connecting inside Lycon" : "Rendering inside Lycon"}</div>{loading ? <div className="load-progress" role="progressbar" aria-label="Loading embedded page"><span /></div> : null}<div ref={coreContainerRef} className="engine-container" /></div> : <><div className="online-visual"><Globe2 size={26} /></div><div className="eyebrow">INTENTIONAL HANDOFF / ONLINE</div><h1>The wild starts here.</h1><p>This address belongs to the wider web. Lycon keeps it inside this workspace until you say go.</p><div className="online-status"><span className="status-dot" /> Online available</div><div className="handoff-card"><div className="handoff-url"><LockKeyhole size={14} /> {page.url}</div><div className="handoff-actions"><button className="primary-btn" onClick={onOpen}><ExternalLink size={15} /> Open inside Lycon</button><button className="secondary-btn" onClick={onBack}><HomeIcon size={14} /> Return to local</button></div><small className="handoff-note">Some sites may restrict embedded rendering. Lycon will never open an external browser window.</small></div></>}</div>;
 }
 
 function PrivacyNotice({ onDismiss, onReview }: { onDismiss: () => void; onReview: () => void }) {
