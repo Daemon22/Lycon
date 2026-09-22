@@ -14,6 +14,20 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!-- Umami analytics — only bootstrapped when endpoint + website id are configured.
+         Guards against a blind request to /umami (404) in environments without analytics. -->
+    <script>
+      (function () {
+        var endpoint = "%VITE_ANALYTICS_ENDPOINT%".trim();
+        var websiteId = "%VITE_ANALYTICS_WEBSITE_ID%".trim();
+        if (endpoint && websiteId) {
+          var umami = document.createElement("script");
+          umami.src = endpoint.replace(/\/+$/, "") + "/umami";
+          umami.defer = true;
+          umami.setAttribute("data-website-id", websiteId);
+          document.head.appendChild(umami);
+        }
+      })();
+    </script>
   </body>
 </html>

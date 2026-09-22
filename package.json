@@ -2,7 +2,7 @@
   "name": "lycon-permanent",
   "version": "1.0.0",
   "type": "module",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "scripts": {
     "version:check": "node scripts/check-version.cjs",
     "version:sync-ui": "sh sync-ui-bundle.sh",
