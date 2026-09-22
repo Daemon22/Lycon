@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>Lycon Browser — Local by Default</title>
-    <script type="module" crossorigin src="/assets/index-DmTUqh8o.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DTTAOsrF.css">
+    <script type="module" crossorigin src="/assets/index-E4h_8kM1.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-uDM6KdCj.css">
   </head>
   <body>
     <script id="manus-runtime">window.__MANUS_HOST_DEV__ = false;
@@ -75,6 +75,20 @@ Error generating stack: `+l.message+`
 </script>
 
     <div id="root"></div>
-    <script defer src="/umami" data-website-id=""></script>
+    <!-- Umami analytics — only bootstrapped when endpoint + website id are configured.
+         Guards against a blind request to /umami (404) in environments without analytics. -->
+    <script>
+      (function () {
+        var endpoint = "".trim();
+        var websiteId = "".trim();
+        if (endpoint && websiteId) {
+          var umami = document.createElement("script");
+          umami.src = endpoint.replace(/\/+$/, "") + "/umami";
+          umami.defer = true;
+          umami.setAttribute("data-website-id", websiteId);
+          document.head.appendChild(umami);
+        }
+      })();
+    </script>
   </body>
 </html>
