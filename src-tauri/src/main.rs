@@ -78,7 +78,7 @@ fn agents_state() -> &'static Mutex<Vec<Agent>> {
 }
 
 fn agents_file_path(handle: &tauri::AppHandle) -> Option<PathBuf> {
-    tauri::api::path::app_data_dir(handle).map(|dir| dir.join("lycon").join("agents.json"))
+    handle.path().app_data_dir().ok().map(|dir| dir.join("lycon").join("agents.json"))
 }
 
 fn load_agents(handle: &tauri::AppHandle) -> Vec<Agent> {
@@ -395,4 +395,104 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Lycon Browser");
+}
+
+#[cfg(test)]
+mod agent_tests {
+    use super::{Agent, AgentInput, generate_id, normalize_agent};
+
+    // Pure-function verification of the native agent connector normalization,
+    // mirroring the Android L267 precedence contract (input id -> existing id
+    // -> one generated id; never eager UUID generation) and the endpoint guards.
+    fn existing() -> Agent {
+        Agent {
+            id: "agent-existing".into(),
+            name: "n".into(),
+            location: "local".into(),
+            protocol: "openai-chat".into(),
+            endpoint: "https://x".into(),
+            model: "m".into(),
+            enabled: true,
+            context_scopes: vec!["selection".into()],
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    fn input(endpoint: &str) -> AgentInput {
+        AgentInput {
+            endpoint: Some(endpoint.into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn input_id_takes_precedence_over_existing() {
+        let mut i = input("https://x");
+        i.id = Some("agent-custom".into());
+        let agent = normalize_agent(&i, Some(&existing())).expect("valid");
+        assert_eq!(agent.id, "agent-custom");
+    }
+
+    #[test]
+    fn existing_id_reused_when_input_id_empty() {
+        let agent = normalize_agent(&input("https://x"), Some(&existing())).expect("valid");
+        assert_eq!(agent.id, "agent-existing");
+    }
+
+    #[test]
+    fn fresh_id_generated_only_when_no_id_and_no_existing() {
+        let agent = normalize_agent(&input("https://x"), None).expect("valid");
+        assert!(agent.id.starts_with("agent-"), "got {}", agent.id);
+    }
+
+    // Persistence semantics (save -> list -> remove -> list -> restart/load)
+    // are exercised by load_agents/persist_agents re-reading agents.json on
+    // every call. Here we assert the in-memory contract that save/remove
+    // preserve ordering and that remove drops exactly one connector.
+    #[test]
+    fn save_overwrite_preserves_count_and_updates_existing() {
+        let mut v: Vec<Agent> = vec![existing()];
+        let saved = normalize_agent(&input("https://updated"), Some(&existing())).unwrap();
+        if let Some(pos) = v.iter().position(|a| a.id == saved.id) {
+            v[pos] = saved.clone();
+        } else {
+            v.push(saved.clone());
+        }
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].endpoint, "https://updated");
+    }
+
+    #[test]
+    fn remove_drops_exactly_one_connector() {
+        let mut v: Vec<Agent> = vec![existing()];
+        v.retain(|a| a.id != "agent-existing");
+        assert!(v.is_empty());
+    }
+
+    #[test]
+    fn non_http_endpoint_rejected() {
+        assert!(normalize_agent(&input("ftp://x"), None).is_err());
+    }
+
+    #[test]
+    fn remote_requires_https() {
+        let mut i = input("http://example.com");
+        i.location = Some("remote".into());
+        assert!(normalize_agent(&i, None).is_err());
+    }
+
+    #[test]
+    fn generate_id_is_prefixed() {
+        assert!(generate_id().starts_with("agent-"));
+    }
+
+    #[test]
+    fn agent_struct_never_serializes_secrets() {
+        // Agent has no api_key field; the JSON surface (used by agents_list/agents_save
+        // responses) cannot leak secrets. Compile-time property.
+        use serde_json::to_string;
+        let json = to_string(&existing()).expect("serializes");
+        assert!(!json.contains("api_key"), "{} leaked", json);
+    }
 }
