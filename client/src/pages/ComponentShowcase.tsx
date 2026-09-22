@@ -575,7 +575,7 @@ export default function ComponentsShowcase() {
                               <CommandItem
                                 key={framework.value}
                                 value={framework.value}
-                                onSelect={currentValue => {
+                                onSelect={(currentValue: string) => {
                                   setSelectedFramework(
                                     currentValue === selectedFramework
                                       ? ""

@@ -135,7 +135,7 @@ class LyconAgentService(private val context: Context) {
         if (location == "remote" && uri.protocol != "https") throw IllegalArgumentException("Remote connections must use HTTPS.")
         if (uri.host == "localhost" || uri.host == "127.0.0.1" || uri.host == "::1") location = "local"
         val now = System.currentTimeMillis()
-        return JSONObject().put("id", input.optString("id", existing?.optString("id", "agent-${UUID.randomUUID()}") ?: "agent-${UUID.randomUUID()}"))
+        return JSONObject().put("id", input.optString("id", "").takeIf { it.isNotEmpty() } ?: existing?.optString("id", "")?.takeIf { it.isNotEmpty() } ?: "agent-${UUID.randomUUID()}")
             .put("name", input.optString("name", existing?.optString("name", "Unnamed connection") ?: "Unnamed connection").trim())
             .put("location", location).put("protocol", "openai-chat").put("endpoint", endpoint)
             .put("model", input.optString("model", existing?.optString("model", "") ?: ""))

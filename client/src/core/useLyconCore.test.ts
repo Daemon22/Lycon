@@ -19,7 +19,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, waitFor, act, type RenderHookResult } from '@testing-library/react';
 import { useLyconCore, type LyconCoreBridge } from './useLyconCore';
 import type { EngineAdapter } from '../../../core/types/06_engine';
-import type { CoreEvent, CommandRejected } from '../../../core/types/04_events';
+import { Id } from '../../../core/types/00_ids';
+import type { CoreEvent, CommandRejected, AgentRegistered, AgentUnregistered } from '../../../core/types/04_events';
 
 interface LyconDiagnostic {
   core: unknown;
@@ -243,5 +244,52 @@ describe('useLyconCore constitutional integration', () => {
     expect(navigateSpy).toHaveBeenCalledWith(expect.objectContaining({ tabId, url: 'https://example.com' }));
     expect(navigateSpy).toHaveBeenCalledTimes(2);
     expect(bridge().state.currentUrl).toBe('https://example.com');
+  });
+
+  it('registers an agent through the Core when the domain is authorized', async () => {
+    await boot();
+    const events = await act(async () => bridge().registerAgent('demo-agent', 'browser'));
+    const registered = events.find((e): e is AgentRegistered => e.type === 'AgentRegistered');
+    expect(registered).toBeTruthy();
+    expect(registered).toMatchObject({ agentName: 'demo-agent', domain: 'browser' });
+  });
+
+  it('rejects agent registration for an unauthorized domain (Core policy before state)', async () => {
+    await boot();
+    const events = await act(async () => bridge().registerAgent('spy-agent', 'observation'));
+    expect(rejected(events, 'RegisterAgent')).toBe(true);
+    const rejection = events.find((e): e is CommandRejected => e.type === 'CommandRejected');
+    expect(rejection?.reason).toMatch(/checkDomain/);
+    expect(rejection?.reason).toMatch('observation');
+  });
+
+  it('unregisters an agent through the Core', async () => {
+    await boot();
+    const events = await act(async () => bridge().unregisterAgent('demo-agent'));
+    const unregistered = events.find((e): e is AgentUnregistered => e.type === 'AgentUnregistered');
+    expect(unregistered).toBeTruthy();
+    expect(unregistered).toMatchObject({ agentName: 'demo-agent' });
+  });
+
+  it('records an agent suggestion as a Core rejection for surface re-issue', async () => {
+    await boot();
+    const tabId = bridge().state.activeTabId as string;
+    const events = await act(async () =>
+      bridge().agentSuggestion('demo-agent', {
+        commandId: Id.command(),
+        participantId: 'demo-agent',
+        timestamp: Date.now(),
+        type: 'Navigate',
+        tabId,
+        url: 'https://example.com',
+      }),
+    );
+    // The Core never auto-executes a suggestion — it records a rejection whose
+    // rejectedCommand.target is the suggested command, so the surface can
+    // re-issue an attributed Command if it chooses to honor it.
+    expect(rejected(events, 'Navigate')).toBe(true);
+    const rejection = events.find((e): e is CommandRejected => e.type === 'CommandRejected');
+    expect(rejection?.reason).toBe('agent-suggestion-requires-surface-re-issue');
+    expect(rejection?.rejectedCommand).toMatchObject({ type: 'Navigate' });
   });
 });

@@ -66,6 +66,23 @@ export interface LyconCoreBridge {
    * (Tauri), and Android (GeckoView) — refreshing via the same Core capability.
    */
   reload: (tabId: TabId) => Promise<CoreEvent[]>;
+  /**
+   * Register an agent participant (Article VII / IX). The Core validates the
+   * agent's authorized domain before emitting AgentRegistered, so the surface
+   * never bypasses Core policy.
+   */
+  registerAgent: (agentName: string, domain: string) => Promise<CoreEvent[]>;
+  /**
+   * Unregister an agent participant. The Core emits AgentUnregistered so peer
+   * surfaces observe the removal through the event stream.
+   */
+  unregisterAgent: (agentName: string) => Promise<CoreEvent[]>;
+  /**
+   * Submit an agent-originated suggestion. Per Article IX the agent never
+   * bypasses the Core: it records a CommandRejected so the surface can
+   * re-issue an attributed Command if it chooses to honor the suggestion.
+   */
+  agentSuggestion: (agentName: string, suggestedAction: Command) => Promise<CoreEvent[]>;
   /** Bind the real engine surface (the iframe host) for the active tab. */
   bindEngineSurface: (container: HTMLElement | null) => Promise<void>;
 }
@@ -369,6 +386,42 @@ export function useLyconCore(): LyconCoreBridge {
     });
   }, [dispatchCommand]);
 
+  // ── Agents (Article VII / IX) ───────────────────────────────────────
+  // These are pure Core command dispatches — the surface never bypasses the
+  // Core's domain policy or event discipline. Native persistence of agent
+  // connectors is handled separately at the platform boundary.
+  const registerAgent = useCallback((agentName: string, domain: string) => {
+    return dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'RegisterAgent',
+      agentName,
+      domain,
+    });
+  }, [dispatchCommand]);
+
+  const unregisterAgent = useCallback((agentName: string) => {
+    return dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'UnregisterAgent',
+      agentName,
+    });
+  }, [dispatchCommand]);
+
+  const agentSuggestion = useCallback((agentName: string, suggestedAction: Command) => {
+    return dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'AgentSuggestion',
+      agentName,
+      suggestedAction,
+    });
+  }, [dispatchCommand]);
+
   const bindEngineSurface = useCallback(async (container: HTMLElement | null): Promise<void> => {
     const adapter = adapterRef.current;
     const tabId = stateRef.current.activeTabId;
@@ -390,6 +443,9 @@ export function useLyconCore(): LyconCoreBridge {
     closeBoundary,
     setShields,
     reload,
+    registerAgent,
+    unregisterAgent,
+    agentSuggestion,
     bindEngineSurface,
   };
 }
