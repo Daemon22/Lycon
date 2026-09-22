@@ -60,6 +60,12 @@ export interface LyconCoreBridge {
   openBoundary: (tabId: TabId, url: string) => Promise<CoreEvent[]>;
   closeBoundary: (tabId: TabId) => Promise<CoreEvent[]>;
   setShields: (tabId: TabId, enabled: boolean, url: string) => Promise<CoreEvent[]>;
+  /**
+   * Reload the tab's current page through the Core -> EngineAdapter path
+   * (Article II: no UI-to-engine shortcuts). Keeps every shell — web, Windows
+   * (Tauri), and Android (GeckoView) — refreshing via the same Core capability.
+   */
+  reload: (tabId: TabId) => Promise<CoreEvent[]>;
   /** Bind the real engine surface (the iframe host) for the active tab. */
   bindEngineSurface: (container: HTMLElement | null) => Promise<void>;
 }
@@ -351,6 +357,18 @@ export function useLyconCore(): LyconCoreBridge {
     return enabled ? closeBoundary(tabId) : openBoundary(tabId, url);
   }, [closeBoundary, openBoundary]);
 
+  // Article III: Reload is a constitutional command routed through LyconCore
+  // so every shell refreshes via the same capability (no direct engine access).
+  const reload = useCallback((tabId: TabId) => {
+    return dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'Reload',
+      tabId,
+    });
+  }, [dispatchCommand]);
+
   const bindEngineSurface = useCallback(async (container: HTMLElement | null): Promise<void> => {
     const adapter = adapterRef.current;
     const tabId = stateRef.current.activeTabId;
@@ -371,6 +389,7 @@ export function useLyconCore(): LyconCoreBridge {
     openBoundary,
     closeBoundary,
     setShields,
+    reload,
     bindEngineSurface,
   };
 }

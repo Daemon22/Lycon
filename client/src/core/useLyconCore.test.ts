@@ -223,4 +223,25 @@ describe('useLyconCore constitutional integration', () => {
     });
     expect(() => diag()).not.toThrow();
   }, 15000);
+
+  it('reloads the active online page through the core and engine adapter', async () => {
+    const d = await boot();
+    const navigateSpy = vi.spyOn(d.adapter, 'navigate');
+    const tabId = bridge().state.activeTabId as string;
+
+    await act(async () => {
+      await bridge().openBoundary(tabId, 'https://example.com');
+      await bridge().navigate(tabId, 'https://example.com');
+    });
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await bridge().reload(tabId);
+    });
+    // Reload re-issues the same URL through the engine adapter (replace=true),
+    // keeping web / Windows / Android shells in lock-step via the Core.
+    expect(navigateSpy).toHaveBeenCalledWith(expect.objectContaining({ tabId, url: 'https://example.com' }));
+    expect(navigateSpy).toHaveBeenCalledTimes(2);
+    expect(bridge().state.currentUrl).toBe('https://example.com');
+  });
 });

@@ -241,7 +241,7 @@ export default function Home() {
   // Constitutional core integration — the single live core instance.
   // The UI is a mirror: all navigation, tab lifecycle, and boundary changes
   // are routed through LyconCore (command/event → policy → engine contract).
-  const { state: coreState, core: lyconCore, dispatch, navigate, goBack, goForward, createTab, activateTab, closeTab: closeCoreTab, setShields, bindEngineSurface } = useLyconCore();
+  const { state: coreState, core: lyconCore, dispatch, navigate, goBack, goForward, createTab, activateTab, closeTab: closeCoreTab, setShields, bindEngineSurface, reload } = useLyconCore();
 
   const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
   const [voskPack, setVoskPack] = usePersistedState<VoskPackState>("lycon-vosk-pack", { status: "not-installed", name: "English (US) · small", size: "40 MB" });
@@ -542,6 +542,21 @@ export default function Home() {
     setOnlineOpened(destination.kind === "online");
   };
 
+  // Reload: online pages live in the engine surface, so they refresh through
+  // the Core -> RealEngineAdapter (Article II: no UI-to-engine shortcuts).
+  // Local (Forest) views have no engine page — they refresh their React
+  // mirror instead. Same surface, identical behaviour on web / Windows / Android.
+  const reloadCurrentPage = async () => {
+    if (!coreState.isReady || !coreState.activeTabId) { showToast("Local page refreshed"); return; }
+    if (!(currentView === "online" && onlineOpened)) { showToast("Local page refreshed"); return; }
+    try {
+      const events = await reload(coreState.activeTabId);
+      showToast(events.some((event) => event.type === "NavigationCompleted") ? "Page reloaded" : "Could not reload page");
+    } catch {
+      showToast("Could not reload page");
+    }
+  };
+
   const mirrorNewTab = (id: TabId, title: string) => {
     setCurrentView("start");
     window.history.pushState({}, "", "/");
@@ -728,7 +743,7 @@ export default function Home() {
         <div className="toolbar tablet-compact-toolbar">
           <button className="icon-btn" onClick={navigateBack} disabled={!activeTab} aria-label="Back"><ArrowLeft size={17} /></button>
           <button className="icon-btn" onClick={navigateForward} disabled={!activeTab} aria-label="Forward"><ArrowRight size={17} /></button>
-          <button className="icon-btn" onClick={() => showToast("Local page refreshed")} aria-label="Reload local page"><RotateCw size={16} /></button>
+          <button className="icon-btn" onClick={reloadCurrentPage} aria-label="Reload page"><RotateCw size={16} /></button>
           <form className="address-wrap" onSubmit={submitAddress}>
             {activeTab?.isPrivate ? <EyeOff size={15} className="private-ink" /> : <LockKeyhole size={14} className={activePage.kind === "local" ? "local-ink" : "online-ink"} />}
             <input ref={addressInputRef} className="address-input" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search locally or enter an address" aria-label="Address and search" />
