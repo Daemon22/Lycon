@@ -6,24 +6,24 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: 255 25% 7%;
+  --background: 255 25% 10%;
   --foreground: 42 30% 95%;
-  --card: 257 22% 10%;
+  --card: 257 22% 13%;
   --card-foreground: 42 30% 95%;
   --popover: 257 22% 10%;
   --popover-foreground: 42 30% 95%;
   --primary: 39 83% 60%;
   --primary-foreground: 255 25% 7%;
-  --secondary: 257 20% 15%;
+  --secondary: 257 20% 18%;
   --secondary-foreground: 42 24% 87%;
-  --muted: 257 15% 18%;
-  --muted-foreground: 258 10% 62%;
+  --muted: 257 15% 21%;
+  --muted-foreground: 258 10% 68%;
   --accent: 276 68% 68%;
   --accent-foreground: 255 25% 7%;
   --border: 257 20% 25%;
   --input: 257 24% 12%;
   --ring: 39 83% 60%;
-  --sidebar: 255 22% 6%;
+  --sidebar: 255 22% 8%;
   --sidebar-foreground: 42 22% 90%;
   --sidebar-accent: 257 19% 14%;
   --radius: 10px;
@@ -162,7 +162,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .page { min-height: 100%; padding: clamp(31px, 7vw, 72px) clamp(22px, 6vw, 78px); animation: page-in .25s cubic-bezier(.23,1,.32,1) both; }
 .page:not(.start-page) { position: relative; }
 .page:not(.start-page)::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 82% 0%, hsl(var(--primary) / .08), transparent 34%); }
-.start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/assets/lycon-public-forest.jpg") center / cover; background-position: center center; } .mode-private .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .92) 0%, hsl(var(--background) / .46) 38%, hsl(var(--background) / .94) 100%), url("/assets/lycon-private-wolf-den.jpg"); } .mode-online .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .9) 0%, hsl(var(--background) / .48) 38%, hsl(var(--background) / .92) 100%), url("/assets/lycon-public-forest.jpg"); }
+.start-page { min-height: 100%; padding-top: clamp(36px, 11vh, 105px); background: linear-gradient(180deg, hsl(var(--background) / .72) 0%, hsl(var(--background) / .28) 38%, hsl(var(--background) / .7) 100%), url("/assets/lycon-public-forest.jpg") center / cover; background-position: center center; } .mode-private .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .74) 0%, hsl(var(--background) / .26) 38%, hsl(var(--background) / .72) 100%), url("/assets/lycon-private-wolf-den.jpg"); } .mode-online .start-page { background-image: linear-gradient(180deg, hsl(var(--background) / .72) 0%, hsl(var(--background) / .28) 38%, hsl(var(--background) / .7) 100%), url("/assets/lycon-public-forest.jpg"); }
 .hero { max-width: 1000px; margin: 0 auto; display: block; }
 .hero-copy-wrap { max-width: 700px; }
 .eyebrow { color: hsl(var(--accent)); font: 10px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; }
@@ -303,7 +303,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .toggle.on { background: hsl(var(--primary) / .65); }
 .toggle.on span { background: hsl(var(--primary-foreground)); transform: translateX(15px); }
 
-.online-page { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(180deg, hsl(var(--background) / .97), hsl(var(--background) / .99)), url("/assets/lycon-public-forest.jpg") center / cover; }
+.online-page { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: linear-gradient(180deg, hsl(var(--background) / .78), hsl(var(--background) / .86)), url("/assets/lycon-public-forest.jpg") center / cover; }
 .online-visual { width: 47px; height: 47px; display: grid; place-items: center; margin-bottom: 17px; color: hsl(var(--primary)); border: 1px solid hsl(var(--primary) / .38); border-radius: 13px; background: hsl(var(--primary) / .1); box-shadow: 0 0 32px hsl(var(--primary) / .1); }
 .online-page h1 { margin: 12px 0 14px; font: 600 clamp(30px, 4vw, 48px)/1 var(--font-display); letter-spacing: -.055em; }
 .online-page > p { max-width: 450px; margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.7; }
@@ -402,3 +402,35 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 @keyframes sync-pulse { 0%, 100% { opacity: .45; transform: scale(.82); } 50% { opacity: 1; transform: scale(1.12); } }
 @media (prefers-reduced-motion: reduce) { .sync-syncing .sync-indicator-dot { animation: none; } }
+
+
+/* Explicit presentation modes sit on top of the normal Auto media-query behavior. */
+.lycon-app.display-mobile .lycon-sidebar { width: 66px; flex-basis: 66px; padding: 18px 8px 12px; }
+.lycon-app.display-mobile .brand-lockup { justify-content: center; padding-inline: 0; }
+.lycon-app.display-mobile .brand-copy,
+.lycon-app.display-mobile .side-label,
+.lycon-app.display-mobile .nav-item span,
+.lycon-app.display-mobile .nav-item b,
+.lycon-app.display-mobile .sidebar-footnote { display: none; }
+.lycon-app.display-mobile .nav-item { justify-content: center; padding-inline: 0; }
+.lycon-app.display-mobile .toolbar { padding: 8px 10px; }
+.lycon-app.display-mobile .console-signal { display: none; }
+.lycon-app.display-mobile .settings-layout { grid-template-columns: 1fr; }
+.lycon-app.display-mobile .settings-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lycon-app.display-mobile .settings-nav button { justify-content: center; }
+.lycon-app.display-mobile .page { padding: 31px 18px; }
+.lycon-app.display-mobile .hero h1 { font-size: 45px; }
+.lycon-app.display-desktop .lycon-sidebar { width: 194px; flex-basis: 194px; padding: 22px 13px 15px; }
+.lycon-app.display-desktop .brand-lockup { justify-content: flex-start; padding: 0 7px 28px; }
+.lycon-app.display-desktop .brand-copy,
+.lycon-app.display-desktop .side-label,
+.lycon-app.display-desktop .sidebar-footnote { display: initial; }
+.lycon-app.display-desktop .nav-item { justify-content: flex-start; padding-inline: 10px; }
+.lycon-app.display-desktop .nav-item span,
+.lycon-app.display-desktop .nav-item b { display: inline; }
+.lycon-app.display-desktop .toolbar { padding: 8px 13px; }
+.lycon-app.display-desktop .console-signal { display: inline-flex; }
+.lycon-app.display-desktop .settings-layout { grid-template-columns: 180px minmax(0, 1fr); }
+.lycon-app.display-desktop .settings-nav { grid-template-columns: 1fr; }
+.lycon-app.display-desktop .settings-nav button { justify-content: flex-start; }
+.display-mode-icons { display: inline-flex; align-items: center; gap: 6px; color: hsl(var(--primary)); }
