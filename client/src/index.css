@@ -434,3 +434,17 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .lycon-app.display-desktop .settings-nav { grid-template-columns: 1fr; }
 .lycon-app.display-desktop .settings-nav button { justify-content: flex-start; }
 .display-mode-icons { display: inline-flex; align-items: center; gap: 6px; color: hsl(var(--primary)); }
+
+
+/* Interactive state feedback: every toggle keeps its current state visible. */
+.icon-btn.state-on { color: hsl(var(--primary)); border-color: hsl(var(--primary) / .38); background: hsl(var(--primary) / .1); box-shadow: inset 0 -2px 0 hsl(var(--primary) / .72); }
+.icon-btn.state-off { color: hsl(var(--muted-foreground)); opacity: .72; }
+.icon-btn.private-control.state-on { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .42); background: hsl(var(--accent) / .12); box-shadow: inset 0 -2px 0 hsl(var(--accent) / .78); }
+.console-signal { transition: color .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.signal-private { border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .1); box-shadow: inset 0 -2px 0 hsl(var(--accent) / .7); }
+.signal-online { border-color: hsl(var(--primary) / .5); background: hsl(var(--primary) / .1); box-shadow: inset 0 -2px 0 hsl(var(--primary) / .7); }
+.signal-local { border-color: hsl(140 53% 62% / .42); background: hsl(140 53% 62% / .07); }
+.embedded-browser { overflow: auto; }
+.embedded-browser iframe.desktop-site-frame { width: 1280px; max-width: none; min-height: min(72vh, 760px); }
+.embedded-browser iframe.responsive-site-frame { width: 100%; }
+.desktop-site-frame + .handoff-note::before { content: "Desktop site is on. "; color: hsl(var(--primary)); }
