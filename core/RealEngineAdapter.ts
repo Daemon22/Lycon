@@ -25,6 +25,11 @@ interface TabHistory {
   index: number;
 }
 
+interface TabSurface {
+  container: HTMLElement | null;
+  sandbox: string[];
+}
+
 export class RealEngineAdapter implements EngineAdapter {
   readonly capabilities: EngineCapabilities = {
     canRenderHtml: true,
@@ -48,6 +53,49 @@ export class RealEngineAdapter implements EngineAdapter {
   private listeners = new Set<EngineEventListener>();
   private history = new Map<TabId, TabHistory>();
   private zoom = new Map<TabId, number>();
+  /**
+   * Per-tab render surfaces. The container is injected by the shell (React)
+   * via `bindContainer` — the adapter never reads browser globals to find it.
+   */
+  private surfaces = new Map<TabId, TabSurface>();
+
+  private currentUrl(tabId: TabId): string | null {
+    const history = this.history.get(tabId);
+    if (!history || history.index < 0) return null;
+    return history.urls[history.index] ?? null;
+  }
+
+  /**
+   * Create (or reuse) the engine iframe inside the bound container and point it
+   * at the tab's current URL. Remote (http/https) pages are rendered in the
+   * iframe; local/reserved pages keep the surface blank.
+   */
+  private renderSurface(tabId: TabId): void {
+    if (typeof document === 'undefined') return;
+    const surface = this.surfaces.get(tabId);
+    if (!surface || !surface.container) return;
+
+    const container = surface.container;
+    let iframe = container.querySelector('iframe');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.setAttribute('title', `Lycon engine view for ${String(tabId)}`);
+      iframe.setAttribute('sandbox', surface.sandbox.join(' '));
+      iframe.setAttribute('referrerpolicy', 'no-referrer');
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.background = 'white';
+      container.appendChild(iframe);
+    }
+
+    const url = this.currentUrl(tabId);
+    if (url && /^https?:/i.test(url)) {
+      iframe.setAttribute('src', url);
+    } else {
+      iframe.removeAttribute('src');
+    }
+  }
   private containers = new Map<TabId, HTMLElement | null>();
 
   private emit(event: EngineEvent): void {
@@ -64,6 +112,31 @@ export class RealEngineAdapter implements EngineAdapter {
     return next;
   }
 
+  /**
+   * Bind (or unbind) a live DOM container to a tab. The adapter creates and
+   * drives the iframe inside the container; a `null` container unbinds without
+   * touching the element.
+   */
+  async bindContainer(tabId: TabId, container: HTMLElement | null): Promise<void> {
+    const existing = this.surfaces.get(tabId);
+    const sandbox = existing?.sandbox ?? ['allow-scripts'];
+    this.surfaces.set(tabId, { container, sandbox });
+
+    if (typeof document !== 'undefined' && container) {
+      container.innerHTML = '';
+      this.renderSurface(tabId);
+    }
+  }
+
+  attach(context: EngineContext): Promise<void> {
+    const tabId = context.tabId;
+    this.zoom.set(tabId, 1);
+    this.surfaces.set(tabId, {
+      container: null,
+      sandbox: [...(context.sandboxAttributes ?? ['allow-scripts'])],
+    });
+
+    if (typeof document !== 'undefined') this.renderSurface(tabId);
   attach(context: EngineContext): Promise<void> {
     const tabId = context.tabId;
     this.zoom.set(tabId, 1);
@@ -105,6 +178,7 @@ export class RealEngineAdapter implements EngineAdapter {
         finalUrl: context.initialUrl,
       });
       history.index = 0;
+      if (typeof document !== 'undefined') this.renderSurface(tabId);
     }
 
     return Promise.resolve();
@@ -113,6 +187,11 @@ export class RealEngineAdapter implements EngineAdapter {
   detach(tabId: TabId): Promise<void> {
     this.history.delete(tabId);
     this.zoom.delete(tabId);
+    const surface = this.surfaces.get(tabId);
+    if (typeof document !== 'undefined' && surface?.container instanceof HTMLElement) {
+      surface.container.innerHTML = '';
+    }
+    this.surfaces.delete(tabId);
     const container = this.containers.get(tabId);
     if (typeof document !== 'undefined' && container instanceof HTMLElement) {
       container.innerHTML = '';
@@ -141,6 +220,7 @@ export class RealEngineAdapter implements EngineAdapter {
       finalUrl: request.url,
     });
 
+    if (typeof document !== 'undefined') this.renderSurface(request.tabId);
     const container = this.containers.get(request.tabId);
     if (typeof document !== 'undefined' && container instanceof HTMLElement) {
       const iframe = container.querySelector('iframe');
@@ -162,6 +242,7 @@ export class RealEngineAdapter implements EngineAdapter {
     this.emit({ type: 'EngineNavigationCompleted', tabId, url, statusCode: 200 });
     this.emit({ type: 'EnginePageLoaded', tabId, url, statusCode: 200, finalUrl: url });
 
+    if (typeof document !== 'undefined') this.renderSurface(tabId);
     const container = this.containers.get(tabId);
     if (typeof document !== 'undefined' && container instanceof HTMLElement) {
       const iframe = container.querySelector('iframe');
@@ -180,6 +261,7 @@ export class RealEngineAdapter implements EngineAdapter {
     this.emit({ type: 'EngineNavigationCompleted', tabId, url, statusCode: 200 });
     this.emit({ type: 'EnginePageLoaded', tabId, url, statusCode: 200, finalUrl: url });
 
+    if (typeof document !== 'undefined') this.renderSurface(tabId);
     const container = this.containers.get(tabId);
     if (typeof document !== 'undefined' && container instanceof HTMLElement) {
       const iframe = container.querySelector('iframe');

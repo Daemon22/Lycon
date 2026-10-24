@@ -1,0 +1,1 @@
+started detached dev: pnpm=C:\Users\Uviwe\AppData\Roaming\npm\pnpm.ps1

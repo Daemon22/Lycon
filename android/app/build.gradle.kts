@@ -10,7 +10,7 @@ android {
     // Read the canonical version from the project root VERSION file.
     // This is the single source of truth — package.json, tauri.conf.json,
     // and this file all derive from it to prevent version drift across platforms.
-    val lyconVersion = file("${rootProject.projectDir}/../../VERSION").readText().trim()
+    val lyconVersion = file("${rootProject.projectDir}/../VERSION").readText().trim()
     val lyconVersionParts = lyconVersion.split(".")
 
     defaultConfig {
