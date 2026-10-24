@@ -60,6 +60,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify version consistency
+        run: node scripts/check-version.cjs
+
       - name: Build and publish Tauri bundle
         uses: tauri-apps/tauri-action@v0
         env:

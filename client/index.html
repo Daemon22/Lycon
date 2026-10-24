@@ -14,6 +14,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <script type="module">
+      const analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
+      const analyticsWebsiteId = "%VITE_ANALYTICS_WEBSITE_ID%";
+      if (analyticsEndpoint && analyticsWebsiteId) {
+        const analyticsScript = document.createElement("script");
+        analyticsScript.defer = true;
+        analyticsScript.src = `${analyticsEndpoint}/umami`;
+        analyticsScript.dataset.websiteId = analyticsWebsiteId;
+        document.body.appendChild(analyticsScript);
+      }
+    </script>
   </body>
 </html>

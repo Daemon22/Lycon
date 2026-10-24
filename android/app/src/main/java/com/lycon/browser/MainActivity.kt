@@ -6,7 +6,7 @@ import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
-import org.mozilla.geckoview.ContentBlockingController
+import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
@@ -38,31 +38,43 @@ class MainActivity : AppCompatActivity() {
         shieldsService = LyconShieldsService()
 
         // GeckoRuntime is per-process; create once
-        runtime = (lastNonConfigurationInstance as? GeckoRuntime) ?: GeckoRuntime.create(this)
+        // GeckoRuntime is recreated per Activity lifecycle (GeckoView 124 removed the
+        // onRetainNonConfigurationInstance retention path used by older samples).
+        runtime = GeckoRuntime.create(this)
         shieldsService.configureRuntime(runtime)
 
-        // Set up the bridge — events are pushed via evaluateJavaScript
+        // Set up the bridge — events are queued and drained by the shell
         bridge = LyconBridge(
             context = this,
             dataService = dataService,
             shieldsService = shieldsService,
-            onEventSender = { event, payload -> sendEventToJs(event, payload) },
             onWindowClose = { finish() },
             onWindowMinimize = { /* Android: not applicable for an Activity */ },
             onWindowMaximize = { /* Android: full-screen toggle would go here */ },
         )
 
         session = GeckoSession()
-        session.settings.userAgentOverride = "Mozilla/5.0 (Linux; Android 14) Gecko/124.0 Lycon/1.0"
+        session.settings.userAgentOverride = "Mozilla/5.0 (Linux; Android 14) Gecko/124.0 Lycon/1.0.0"
         session.open(runtime)
 
-        // Inject the bridge script before any page scripts run
-        session.loadUri("about:blank")
+        // The Lycon UI is the canonical React frontend built from client/
+        // (same bundle that Tauri serves on Windows). The React app is
+        // self-contained — it manages its own tabs, bookmarks, history, and
+        // settings via localStorage. GeckoView provides the native platform
+        // features that the React layer cannot implement on its own:
+        //   - Built-in content blocking (shields) via TrackingProtection
+        //   - HTTPS-Only mode via the navigation delegate below
+        //   - System download handling
+        // The prompt-RPC bridge (LyconBridge.kt) is retained so that
+        // future native↔JS features can be added without changing the
+        // asset bundle structure.
 
         // Set up delegates
         setupSessionDelegates()
 
-        // Load the Lycon UI bundle from assets/lycon-ui/index.html
+        // Load the canonical React frontend from assets/lycon-ui/index.html
+        // (synced from client/ via ./sync-ui-bundle.sh — identical to the
+        //  Windows Tauri build).
         geckoView.setSession(session)
         loadLyconUI()
 
@@ -71,22 +83,24 @@ class MainActivity : AppCompatActivity() {
         shieldsService.isEnabled = settings.optBoolean("shieldsEnabled", true)
     }
 
-    override fun onRetainNonConfigurationInstance(): Any = runtime
-
     private fun setupSessionDelegates() {
-        // Prompt delegate — intercepts window.prompt() for the bridge protocol
+        // Prompt delegate — intercepts window.prompt() calls from the UI.
+        // The canonical React frontend does not use the prompt-RPC bridge for
+        // data (it manages state in localStorage), but the delegate is retained
+        // so that native↔JS features can be invoked from future UI modules or
+        // the bridge.js fallback path.
         session.promptDelegate = object : GeckoSession.PromptDelegate {
-            override fun onPromptPrompt(
+            override fun onTextPrompt(
                 session: GeckoSession,
-                prompt: GeckoSession.PromptDelegate.PromptPrompt
+                prompt: GeckoSession.PromptDelegate.TextPrompt
             ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
                 return GeckoResult.fromValue(handleBridgePrompt(prompt))
             }
         }
 
         // Content blocking delegate — increments shields counter when requests are blocked
-        session.contentBlockingDelegate = object : ContentBlockingController.EventDelegate {
-            override fun onContentBlocked(session: GeckoSession, event: ContentBlockingController.Event) {
+        session.contentBlockingDelegate = object : ContentBlocking.Delegate {
+            override fun onContentBlocked(session: GeckoSession, event: ContentBlocking.BlockEvent) {
                 shieldsService.onBlocked()
                 bridge.sendEvent("shields:blocked", JSONObject().apply {
                     put("url", "")
@@ -147,7 +161,7 @@ class MainActivity : AppCompatActivity() {
      *   lycon:invoke:<callId>:<action>:<payloadJson>
      */
     private fun handleBridgePrompt(
-        prompt: GeckoSession.PromptDelegate.PromptPrompt
+        prompt: GeckoSession.PromptDelegate.TextPrompt
     ): GeckoSession.PromptDelegate.PromptResponse {
         val msg = prompt.message ?: ""
         if (!msg.startsWith("lycon:invoke:")) {
@@ -155,11 +169,29 @@ class MainActivity : AppCompatActivity() {
             return prompt.dismiss()
         }
         try {
-            val parts = msg.split(":", limit = 4)
-            if (parts.size != 4) return prompt.dismiss()
-            val callId = parts[2]
-            val action = parts[3].substringBefore(":")
-            val payloadStr = parts[3].substringAfter(":", "")
+            val body = msg.removePrefix("lycon:invoke:")
+            val colon1 = body.indexOf(':')
+            if (colon1 <= 0) return prompt.dismiss()
+            val rest = body.substring(colon1 + 1)
+
+            // Action names contain ':' themselves (settings:get, shell:collectEvents)
+            // and payloads may contain ':' too, so resolve the action against the
+            // known handler vocabulary instead of blind colon-splitting.
+            var action: String? = null
+            var payloadStr = ""
+            for (key in bridge.actions()) {
+                if (rest == key) {
+                    action = key
+                    payloadStr = ""
+                    break
+                }
+                if (rest.startsWith("$key:")) {
+                    action = key
+                    payloadStr = rest.substring(key.length + 1)
+                    break
+                }
+            }
+            if (action == null) return prompt.dismiss()
             val payload = if (payloadStr.isNotEmpty() && payloadStr != "null") {
                 JSONObject(payloadStr)
             } else null
@@ -181,19 +213,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadLyconUI() {
-        // Load the shared Lycon UI from assets/lycon-ui/index.html
-        // GeckoView can load asset:// URLs
+        // Load the canonical React frontend (built from client/) from
+        // assets/lycon-ui/index.html. This is the same bundle that Tauri
+        // serves on Windows — ensuring UI parity across platforms.
+        // GeckoView can load asset:// URLs.
         session.loadUri("resource://android/assets/lycon-ui/index.html")
-    }
-
-    /**
-     * Push an event to the JS side by calling window.__lyconBridge.onEvent().
-     */
-    private fun sendEventToJs(event: String, payload: JSONObject) {
-        val escapedEvent = JSONObject.quote(event)
-        val payloadStr = payload.toString()
-        val js = "window.__lyconBridge && window.__lyconBridge.onEvent($escapedEvent, $payloadStr);"
-        session.evaluateJavaScript(js, null)
     }
 
     override fun onDestroy() {

@@ -16,8 +16,8 @@ import {
   LYCON_SYNC_CHANNELS,
   LYCON_CAPABILITIES,
 } from '../index.js';
-import { lyconManifest } from '@manya/toolkit';
-import { createBus, subscribe } from '@manya/unify';
+import { lyconManifest } from '@manya-hael/toolkit';
+import { createBus, subscribe } from '../event-bus.js';
 
 // -- Constants --
 

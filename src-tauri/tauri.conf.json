@@ -36,7 +36,7 @@
       "icons/512x512.png",
       "icons/icon.ico"
     ],
-    "category": "Browser",
+    "category": "Utility",
     "shortDescription": "A local-first browser for the quiet web.",
     "longDescription": "Lycon Browser keeps local browsing data in focus and makes online handoffs deliberate."
   }

@@ -7,12 +7,18 @@ android {
     namespace = "com.lycon.browser"
     compileSdk = 34
 
+    // Read the canonical version from the project root VERSION file.
+    // This is the single source of truth — package.json, tauri.conf.json,
+    // and this file all derive from it to prevent version drift across platforms.
+    val lyconVersion = file("${rootProject.projectDir}/../../VERSION").readText().trim()
+    val lyconVersionParts = lyconVersion.split(".")
+
     defaultConfig {
         applicationId = "com.lycon.browser"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = lyconVersionParts[0].toInt() * 10000 + lyconVersionParts[1].toInt() * 100 + lyconVersionParts[2].toInt()
+        versionName = lyconVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,6 +27,17 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    // Per-ABI splits: keeps install sizes small on the device (GeckoView is huge),
+    // while still producing a full universal APK for stores.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -58,8 +75,12 @@ dependencies {
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // GeckoView — Firefox's engine, with built-in tracking protection
-    // (replaces Google's WebView; required for our shields approach)
-    implementation("org.mozilla.geckoview:geckoview:124.0.20240304043214")
+    // (replaces Google's WebView; required for our shields approach).
+    // NOTE: the README previously pinned 124.0.20240304043214, which was never
+    // published to the Mozilla Maven repo (the 124.0 line actually starts at
+    // 124.0.20240311145044). Using the closest published 124.0 build so Gradle
+    // can resolve the artifact. See https://maven.mozilla.org/ .
+    implementation("org.mozilla.geckoview:geckoview:124.0.20240311145044")
 
     // Kotlin coroutines for async work
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")

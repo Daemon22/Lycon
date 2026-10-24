@@ -1,0 +1,97 @@
+name: Android releases
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PNPM_VERSION: 10.4.1
+
+jobs:
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify version consistency
+        run: |
+          node scripts/check-version.cjs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the canonical React frontend
+        run: pnpm run build
+
+      - name: Sync the React bundle into Android assets
+        run: |
+          rm -rf android/app/src/main/assets/lycon-ui
+          mkdir -p android/app/src/main/assets/lycon-ui
+          cp -r dist/public/* android/app/src/main/assets/lycon-ui/
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          ndk: 26.1.10909125
+          abi: arm64-v8a,armeabi-v7a,x86_64
+
+      - name: Build debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lycon-browser-${{ github.ref_name || 'dev' }}-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Build release APK (unsigned)
+        if: github.ref_type == 'tag'
+        run: |
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Upload release APK
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lycon-browser-${{ github.ref_name }}/android
+          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+
+      - name: Create GitHub release with APKs
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+          tag_name: ${{ github.ref_name }}
+          name: Lycon Browser ${{ github.ref_name }}
+          body: Cross-platform Lycon Browser release. Includes the canonical React frontend shared with the Tauri desktop build.

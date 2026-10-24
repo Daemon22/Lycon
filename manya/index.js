@@ -38,7 +38,7 @@ export const LYCON_SYNC_CHANNELS = [
 
 /**
  * Manya-Lycon capabilities — owned by the lycon tool, distinct from all other
- * Manya tools. These are also declared in @manya/toolkit's capabilityOwners.
+ * Manya tools. These are also declared in @manya-hael/toolkit's capabilityOwners.
  */
 export const LYCON_CAPABILITIES = [
   'webBrowsing',
@@ -231,7 +231,7 @@ function publishToBus(bus, topic, event) {
   if (typeof bus._publish === 'function') {
     return bus._publish(topic, event);
   }
-  // Fallback: iterate subscribers directly (matches @manya/unify eventbus internal shape)
+  // Compatibility fallback for callers that provide a legacy-shaped bus.
   const enriched = {
     eventId: `evt-${randomUUID().slice(0, 12)}`,
     topic,
