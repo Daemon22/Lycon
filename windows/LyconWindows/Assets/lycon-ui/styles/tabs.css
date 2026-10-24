@@ -1,0 +1,130 @@
+/* ===================================================================
+   Lycon Browser — Tabs
+   =================================================================== */
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  min-width: 130px;
+  max-width: 220px;
+  height: calc(var(--tab-h) - 4px);
+  align-self: flex-end;
+  background: var(--bg-tab);
+  border-radius: var(--radius-tab);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s, transform 0.08s, border-color 0.12s;
+  user-select: none;
+}
+.tab:hover { background: var(--bg-tab-hover); }
+.tab.active {
+  background: var(--bg-tab-active);
+  border-color: var(--border);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+.tab.dragging { opacity: 0.4; }
+.tab.drag-over { box-shadow: inset -2px 0 0 var(--accent); }
+
+.tab-favicon {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg-secondary);
+}
+.tab-favicon img {
+  width: 18px; height: 18px;
+  border-radius: 2px;
+}
+.tab-favicon .spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tab-title {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--fg-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.tab.active .tab-title { color: var(--fg-primary); }
+
+.tab-close {
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+.tab-close:hover { background: var(--bg-tab-hover); color: var(--fg-primary); }
+
+/* Private tab indicator */
+.tab.private .tab-favicon::after {
+  content: 'P';
+  position: absolute;
+  right: -5px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--lycon-purple);
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tab.private {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--lycon-purple) 10%, transparent), transparent);
+}
+.tab.private.active {
+  background: var(--bg-tab-active);
+  box-shadow: inset 0 2px 0 var(--lycon-purple);
+  padding-top: 0;
+}
+
+/* Pinned tabs — narrower, no title */
+.tab.pinned {
+  min-width: 36px;
+  max-width: 44px;
+  padding: 0 6px;
+}
+.tab.pinned .tab-close { display: none; }
+
+/* Muted tabs use a subtle state treatment; the label is added by tabs.js. */
+.tab.muted .tab-title { color: var(--fg-muted); }
+
+/* New tab button */
+.tab-new {
+  align-self: flex-end;
+  width: 30px; height: calc(var(--tab-h) - 4px);
+  display: grid; place-items: center;
+  font-size: 18px;
+  color: var(--fg-secondary);
+  border-radius: var(--radius-sm);
+  margin-left: 2px;
+}
+.tab-new:hover { background: var(--bg-tab-hover); color: var(--fg-primary); }

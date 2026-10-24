@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lycon — New Tab</title>
+  <style>
+    :root {
+      --accent: #d4a574;
+      --accent-hover: #f4c430;
+      --bg: #17120f;
+      --surface: rgba(42, 32, 26, 0.78);
+      --surface-strong: rgba(48, 37, 29, 0.94);
+      --line: rgba(212, 165, 116, 0.16);
+      --text: #f8f0e5;
+      --muted: #b3a28e;
+      --subtle: #776957;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    html { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, "Helvetica Neue", Arial, sans-serif; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(ellipse at 18% 0%, rgba(212,165,116,0.17) 0%, transparent 36%),
+        radial-gradient(ellipse at 86% 100%, rgba(56,170,160,0.08) 0%, transparent 32%),
+        linear-gradient(145deg, #17120f 0%, #211914 58%, #302319 100%);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px 34px;
+      overflow: auto;
+    }
+    body.light {
+      --bg: #f5f0e8;
+      --surface: rgba(255,255,255,0.78);
+      --surface-strong: rgba(255,255,255,0.94);
+      --line: rgba(61,43,29,0.13);
+      --text: #221a14;
+      --muted: #574a3e;
+      --subtle: #8b7b69;
+      background:
+        radial-gradient(ellipse at 18% 0%, rgba(212,165,116,0.19) 0%, transparent 36%),
+        linear-gradient(145deg, #f5f0e8 0%, #ffffff 70%);
+    }
+    .page { width: min(100%, 700px); text-align: center; }
+    .logo {
+      display: inline-flex;
+      margin-bottom: 18px;
+      animation: floaty 4s ease-in-out infinite;
+    }
+    .logo img {
+      width: 84px;
+      height: 84px;
+      object-fit: cover;
+      border-radius: 16px;
+      filter: drop-shadow(0 12px 28px rgba(212,165,116,0.28));
+    }
+    @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    .brand { font-size: clamp(30px, 4vw, 38px); font-weight: 750; letter-spacing: 0.6px; margin-bottom: 7px; }
+    .brand .accent { color: var(--accent); }
+    .tagline { font-size: 13px; color: var(--muted); letter-spacing: 0.2px; margin-bottom: 30px; }
+    .tagline-note { color: var(--accent); }
+    .search-wrap {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      padding: 4px 6px 4px 18px;
+      box-shadow: 0 16px 42px rgba(0,0,0,0.22);
+      transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+    }
+    .search-wrap:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent), 0 16px 42px rgba(0,0,0,0.22);
+    }
+    .search-wrap svg { color: var(--muted); flex-shrink: 0; }
+    .search-input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: inherit;
+      font-size: 15px;
+      padding: 12px 4px;
+    }
+    .search-input::placeholder { color: var(--subtle); }
+    .search-btn {
+      background: var(--accent);
+      color: #211914;
+      border: 0;
+      padding: 10px 22px;
+      border-radius: 22px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .search-btn:hover { background: var(--accent-hover); }
+    .search-btn:active { transform: scale(0.97); }
+    .engine-label { font-size: 11px; color: var(--subtle); margin-top: 11px; }
+    .engine-label b { color: var(--accent); }
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: left;
+      margin: 30px 0 12px;
+    }
+    .section-label::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+    .shortcuts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 11px;
+      width: 100%;
+    }
+    .shortcut, .local-card {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 14px 13px;
+      border-radius: 13px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s, border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+    }
+    .shortcut:hover, .local-card:hover {
+      background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+      border-color: color-mix(in srgb, var(--accent) 72%, var(--line));
+      transform: translateY(-2px);
+      box-shadow: 0 9px 22px rgba(0,0,0,0.14);
+    }
+    .shortcut:focus-visible, .local-card:focus-visible, .search-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+    .shortcut-icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 28px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--brand) 12%, transparent);
+    }
+    .shortcut-icon img { width: 20px; height: 20px; object-fit: contain; }
+    .shortcut-icon[data-tone="light"] { background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
+    .shortcut-copy { min-width: 0; }
+    .shortcut-title { display: block; font-size: 12px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .shortcut-domain { display: block; color: var(--subtle); font-size: 10px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .local-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+    .local-card { background: color-mix(in srgb, var(--surface-strong) 86%, var(--accent) 14%); }
+    .local-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 32px;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      border-radius: 9px;
+    }
+    .local-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .local-copy { min-width: 0; }
+    .local-title { display: block; color: var(--text); font-size: 12px; font-weight: 700; }
+    .local-detail { display: block; color: var(--muted); font-size: 10px; margin-top: 3px; }
+    .footer { margin-top: 30px; color: var(--subtle); font-size: 11px; letter-spacing: 0.15px; }
+    .footer b { color: var(--accent); }
+    @media (max-width: 620px) {
+      body { justify-content: flex-start; padding-top: 32px; }
+      .logo img { width: 72px; height: 72px; border-radius: 14px; }
+      .shortcuts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 400px) {
+      .search-wrap { padding-left: 13px; gap: 5px; }
+      .search-btn { padding-inline: 15px; }
+      .local-tools { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="logo">
+      <img src="./assets/wolf-logo.png" alt="Lycon wolf mascot" width="84" height="84" />
+    </div>
+    <div class="brand">L<span class="accent">y</span>con</div>
+    <div class="tagline">Browse wild. Browse free. <span class="tagline-note">Intelligence is optional.</span></div>
+
+    <form class="search-wrap" id="search-form" role="search">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input class="search-input" id="q" type="text" placeholder="Search or type a URL" autocomplete="off" spellcheck="false" autofocus aria-label="Search or type a URL" />
+      <button class="search-btn" type="submit">Search</button>
+    </form>
+    <div class="engine-label">Powered by <b id="engine-name">DuckDuckGo</b> · queries stay private</div>
+
+    <div class="section-label">Your web</div>
+    <div class="shortcuts" id="shortcuts"></div>
+
+    <div class="section-label">On this device</div>
+    <div class="local-tools">
+      <a class="local-card" href="lycon-action://open-file" id="open-local-file" aria-label="Open a local file">
+        <span class="local-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-11Z"/><path d="M4 9h16"/></svg></span>
+        <span class="local-copy"><span class="local-title">Open a local file</span><span class="local-detail">Browse HTML, PDF, text, images, and more</span></span>
+      </a>
+      <a class="local-card" href="file:///" id="open-local-root" aria-label="Browse local files">
+        <span class="local-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H10l2 2h5.5A2.5 2.5 0 0 1 20 7.5v9a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-11Z"/><path d="M7 13h10M7 16h7"/></svg></span>
+        <span class="local-copy"><span class="local-title">Browse local files</span><span class="local-detail">Open the local file system directly</span></span>
+      </a>
+      <a class="local-card" href="lycon-action://open-agents" id="open-agents" aria-label="Open optional intelligence">
+        <span class="local-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="m9.2 10.8 5.6-2.6M9.2 13.2l5.6 2.6"/></svg></span>
+        <span class="local-copy"><span class="local-title">Connect intelligence</span><span class="local-detail">Optional local or remote allies, on your terms</span></span>
+      </a>
+    </div>
+
+    <div class="footer"><b>Lycon</b> v1.0 · privacy-first browsing</div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const engineName = params.get('engine') || 'duckduckgo';
+    const accent = params.get('accent') || 'orange';
+    const theme = params.get('theme') || 'dark';
+    const accentColors = { orange: '#d4a574', purple: '#38aaa0', pink: '#7fb069' };
+    document.documentElement.style.setProperty('--accent', accentColors[accent] || accentColors.orange);
+    if (theme === 'light') document.body.classList.add('light');
+
+    const engineNames = { duckduckgo: 'DuckDuckGo', google: 'Google', bing: 'Bing', startpage: 'Startpage' };
+    const engineUrls = {
+      duckduckgo: 'https://duckduckgo.com/?q=',
+      google: 'https://www.google.com/search?q=',
+      bing: 'https://www.bing.com/search?q=',
+      startpage: 'https://www.startpage.com/sp/search?query='
+    };
+    const engineLabel = engineNames[engineName] || 'DuckDuckGo';
+    document.getElementById('engine-name').textContent = engineLabel;
+    document.getElementById('q').placeholder = `Search ${engineLabel} or type a URL`;
+
+    const shortcuts = [
+      { title: 'DuckDuckGo', domain: 'duckduckgo.com', url: 'https://duckduckgo.com', icon: 'duckduckgo', color: '#DE5833' },
+      { title: 'YouTube', domain: 'youtube.com', url: 'https://youtube.com', icon: 'youtube', color: '#FF0000' },
+      { title: 'Wikipedia', domain: 'wikipedia.org', url: 'https://wikipedia.org', icon: 'wikipedia', color: '#000000', tone: 'light' },
+      { title: 'GitHub', domain: 'github.com', url: 'https://github.com', icon: 'github', color: '#181717', tone: 'light' },
+      { title: 'Reddit', domain: 'reddit.com', url: 'https://reddit.com', icon: 'reddit', color: '#FF4500' },
+      { title: 'Hacker News', domain: 'news.ycombinator.com', url: 'https://news.ycombinator.com', icon: 'hacker-news', color: '#FF6600' },
+      { title: 'MDN Web Docs', domain: 'developer.mozilla.org', url: 'https://developer.mozilla.org', icon: 'mdnwebdocs', color: '#000000', tone: 'light' },
+      { title: 'Proton Mail', domain: 'proton.me/mail', url: 'https://proton.me/mail', icon: 'protonmail', color: '#6D4AFF' },
+    ];
+    const shortcutRoot = document.getElementById('shortcuts');
+    for (const shortcut of shortcuts) {
+      const link = document.createElement('a');
+      link.className = 'shortcut';
+      link.href = shortcut.url;
+      link.title = shortcut.title;
+      link.setAttribute('aria-label', `Open ${shortcut.title}`);
+      link.innerHTML = `<span class="shortcut-icon" data-tone="${shortcut.tone || 'brand'}" style="--brand:${shortcut.color}"><img src="./assets/brands/${shortcut.icon}.svg" alt="" aria-hidden="true"></span><span class="shortcut-copy"><span class="shortcut-title">${shortcut.title}</span><span class="shortcut-domain">${shortcut.domain}</span></span>`;
+      shortcutRoot.appendChild(link);
+    }
+
+    const URL_RE = /^(https?:\/\/|file:\/\/|lycon-action:\/\/)/i;
+    const DOMAIN_RE = /^([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/.*)?$/i;
+    function resolve(text) {
+      text = (text || '').trim();
+      if (!text) return '';
+      if (URL_RE.test(text)) return text;
+      if (DOMAIN_RE.test(text)) return 'https://' + text;
+      return (engineUrls[engineName] || engineUrls.duckduckgo) + encodeURIComponent(text);
+    }
+    document.getElementById('q').addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') e.currentTarget.value = '';
+    });
+    document.getElementById('search-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const url = resolve(document.getElementById('q').value);
+      if (url) window.location.href = url;
+    });
+
+    document.getElementById('open-local-file').addEventListener('click', (e) => {
+      e.preventDefault();
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '*/*';
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (file) window.location.href = URL.createObjectURL(file);
+      }, { once: true });
+      input.click();
+    });
+
+    document.getElementById('open-local-root').addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = 'file:///';
+    });
+  </script>
+</body>
+</html>
