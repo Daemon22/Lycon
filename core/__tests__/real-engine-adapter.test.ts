@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, it, expect } from 'vitest';
 import { RealEngineAdapter } from '../RealEngineAdapter';
 import type { TabId } from '../types/00_ids';

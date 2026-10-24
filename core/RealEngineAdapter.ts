@@ -96,6 +96,7 @@ export class RealEngineAdapter implements EngineAdapter {
       iframe.removeAttribute('src');
     }
   }
+  private containers = new Map<TabId, HTMLElement | null>();
 
   private emit(event: EngineEvent): void {
     for (const listener of [...this.listeners]) {
@@ -136,6 +137,25 @@ export class RealEngineAdapter implements EngineAdapter {
     });
 
     if (typeof document !== 'undefined') this.renderSurface(tabId);
+  attach(context: EngineContext): Promise<void> {
+    const tabId = context.tabId;
+    this.zoom.set(tabId, 1);
+    this.containers.set(tabId, context.container);
+
+    if (typeof document !== 'undefined' && context.container instanceof HTMLElement) {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('title', `Lycon engine view for ${String(tabId)}`);
+      iframe.setAttribute('sandbox', [...(context.sandboxAttributes ?? [])].join(' '));
+      iframe.setAttribute('referrerpolicy', 'no-referrer');
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.background = 'white';
+      if (context.initialUrl) iframe.setAttribute('src', context.initialUrl);
+
+      context.container.innerHTML = '';
+      context.container.appendChild(iframe);
+    }
 
     const history = this.ensureHistory(tabId, context.initialUrl ?? undefined);
     if (context.initialUrl) {
@@ -172,6 +192,11 @@ export class RealEngineAdapter implements EngineAdapter {
       surface.container.innerHTML = '';
     }
     this.surfaces.delete(tabId);
+    const container = this.containers.get(tabId);
+    if (typeof document !== 'undefined' && container instanceof HTMLElement) {
+      container.innerHTML = '';
+    }
+    this.containers.delete(tabId);
     return Promise.resolve();
   }
 
@@ -196,6 +221,13 @@ export class RealEngineAdapter implements EngineAdapter {
     });
 
     if (typeof document !== 'undefined') this.renderSurface(request.tabId);
+    const container = this.containers.get(request.tabId);
+    if (typeof document !== 'undefined' && container instanceof HTMLElement) {
+      const iframe = container.querySelector('iframe');
+      if (iframe) {
+        iframe.setAttribute('src', request.url);
+      }
+    }
 
     return Promise.resolve();
   }
@@ -211,6 +243,11 @@ export class RealEngineAdapter implements EngineAdapter {
     this.emit({ type: 'EnginePageLoaded', tabId, url, statusCode: 200, finalUrl: url });
 
     if (typeof document !== 'undefined') this.renderSurface(tabId);
+    const container = this.containers.get(tabId);
+    if (typeof document !== 'undefined' && container instanceof HTMLElement) {
+      const iframe = container.querySelector('iframe');
+      if (iframe) iframe.setAttribute('src', url);
+    }
     return Promise.resolve();
   }
 
@@ -225,6 +262,11 @@ export class RealEngineAdapter implements EngineAdapter {
     this.emit({ type: 'EnginePageLoaded', tabId, url, statusCode: 200, finalUrl: url });
 
     if (typeof document !== 'undefined') this.renderSurface(tabId);
+    const container = this.containers.get(tabId);
+    if (typeof document !== 'undefined' && container instanceof HTMLElement) {
+      const iframe = container.querySelector('iframe');
+      if (iframe) iframe.setAttribute('src', url);
+    }
     return Promise.resolve();
   }
 
