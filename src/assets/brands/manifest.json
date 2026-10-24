@@ -1,0 +1,87 @@
+{
+  "provider": "Simple Icons + first-party source assets",
+  "providerUrl": "https://github.com/simple-icons/simple-icons",
+  "generatedAt": "2026-08-25T20:41:30.123Z",
+  "icons": {
+    "duckduckgo": {
+      "title": "DuckDuckGo",
+      "slug": "duckduckgo",
+      "asset": "./duckduckgo.svg",
+      "brandColor": "#DE5833",
+      "source": "https://github.com/duckduckgo/duckduckgo-privacy-extension/blob/5c6ac8d6a07421adbfb97ee2ff855dd7655f8d71/shared/img/logo-small-grayscale.svg",
+      "guidelines": "https://duckduckgo.com/press#press-materials",
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/duckduckgo.svg"
+    },
+    "youtube": {
+      "title": "YouTube",
+      "slug": "youtube",
+      "asset": "./youtube.svg",
+      "brandColor": "#FF0000",
+      "source": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors",
+      "guidelines": "https://www.youtube.com/howyoutubeworks/resources/brand-resources/#logos-icons-and-colors",
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/youtube.svg"
+    },
+    "wikipedia": {
+      "title": "Wikipedia",
+      "slug": "wikipedia",
+      "asset": "./wikipedia.svg",
+      "brandColor": "#000000",
+      "source": "https://commons.wikimedia.org/wiki/File:Wikipedia-logo-v2.svg",
+      "guidelines": null,
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/wikipedia.svg"
+    },
+    "github": {
+      "title": "GitHub",
+      "slug": "github",
+      "asset": "./github.svg",
+      "brandColor": "#181717",
+      "source": "https://github.com/logos",
+      "guidelines": "https://github.com/logos",
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/github.svg"
+    },
+    "reddit": {
+      "title": "Reddit",
+      "slug": "reddit",
+      "asset": "./reddit.svg",
+      "brandColor": "#FF4500",
+      "source": "https://www.redditinc.com/brand",
+      "guidelines": "https://www.redditinc.com/brand",
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/reddit.svg"
+    },
+    "mdnwebdocs": {
+      "title": "MDN Web Docs",
+      "slug": "mdnwebdocs",
+      "asset": "./mdnwebdocs.svg",
+      "brandColor": "#000000",
+      "source": "https://github.com/mdn/yari/blob/77e6cda02f7013219e9da27a00b9424085e60fdb/client/src/assets/mdn-logo.svg",
+      "guidelines": null,
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/mdnwebdocs.svg"
+    },
+    "protonmail": {
+      "title": "Proton Mail",
+      "slug": "protonmail",
+      "asset": "./protonmail.svg",
+      "brandColor": "#6D4AFF",
+      "source": "https://proton.me/media/kit",
+      "guidelines": null,
+      "license": null,
+      "assetSource": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/protonmail.svg"
+    },
+    "hacker-news": {
+      "title": "Hacker News",
+      "slug": "hacker-news",
+      "asset": "./hacker-news.svg",
+      "brandColor": "#FF6600",
+      "source": "https://news.ycombinator.com/y18.svg",
+      "guidelines": null,
+      "license": null,
+      "assetSource": "https://news.ycombinator.com/y18.svg"
+    }
+  }
+}
