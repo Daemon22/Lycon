@@ -23,7 +23,7 @@
  *   S11 — the engine context never receives the identity record.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { LyconCore } from '../LyconCore';
 import { FakeEngineAdapter } from '../FakeEngineAdapter';
 import { Id } from '../types/00_ids';
@@ -40,12 +40,14 @@ import type {
   RegisterAgent,
   GoBack,
   GoForward,
+  StopNavigation,
   CloseTab,
   SuspendCore,
   ResumeCore,
 } from '../types/03_commands';
 import type { CoreEvent } from '../types/04_events';
 import { PRIVATE_SESSION_FORBIDDEN_CAPABILITIES } from '../types/05_policy';
+import type { EngineNavigationRequest } from '../types/06_engine';
 import { LYCON_IDENTITY_V1, verifyIdentity } from '../03_sovereign_identity';
 import type { SovereignIdentity } from '../03_sovereign_identity';
 
@@ -90,8 +92,8 @@ interface Harness {
 }
 
 /** Fixture: boot → identity → session → window → tab. Engine attached only on activate. */
-async function bootWithTab(opts?: { identity?: SovereignIdentity }): Promise<Harness> {
-  const engine = new FakeEngineAdapter();
+async function bootWithTab(opts?: { identity?: SovereignIdentity; engine?: FakeEngineAdapter }): Promise<Harness> {
+  const engine = opts?.engine ?? new FakeEngineAdapter();
   const calls: Array<{ method: string; args: unknown[] }> = [];
   const core = new LyconCore(recording(engine, calls), opts?.identity ?? LYCON_IDENTITY_V1);
   const boot = await core.boot();
@@ -261,6 +263,112 @@ describe('Gate 7: Full lifecycle against the fake engine', () => {
     expect(again.some((e) => e.type === 'CommandRejected')).toBe(true);
   });
 
+  it('rejects script and unsupported URL schemes before creating navigation state', async () => {
+    const { core, calls, tabId } = await bootWithTab();
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    const pageCount = core.getTab(tabId)!.pageIds.length;
+
+    const rejected = await core.dispatch(
+      cmd<Navigate>({ type: 'Navigate', tabId, url: 'javascript:alert(1)' })
+    );
+
+    expect(rejected.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(calls.some((call) => call.method === 'navigate')).toBe(false);
+    expect(core.getTab(tabId)!.pageIds).toHaveLength(pageCount);
+  });
+
+  it('detaches the previously visible tab when a different tab becomes active', async () => {
+    const { core, calls, tabId, windowId } = await bootWithTab();
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    const created = await core.dispatch(
+      cmd<CreateTab>({ type: 'CreateTab', windowId, typeKind: 'normal' })
+    );
+    const nextTabId = created.find((event) => event.type === 'TabCreated')!.tabId;
+
+    const activated = await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId: nextTabId }));
+
+    expect(activated.some((event) => event.type === 'TabActivated')).toBe(true);
+    expect(core.getTab(tabId)?.lifecycle).toBe('inactive');
+    expect(core.getTab(nextTabId)?.lifecycle).toBe('active');
+    expect(calls.filter((call) => call.method === 'detach')).toHaveLength(1);
+  });
+
+  it('seals the engine boundary before reporting network capability revocation', async () => {
+    const { core, calls, tabId } = await bootWithTab();
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    await core.dispatch(cmd<OpenBoundary>({ type: 'OpenBoundary', tabId, url: 'https://example.com' }));
+    await core.dispatch(cmd<Navigate>({ type: 'Navigate', tabId, url: 'https://example.com' }));
+
+    const sealed = await core.dispatch(cmd<CloseBoundary>({ type: 'CloseBoundary', tabId }));
+
+    expect(calls.some((call) => call.method === 'sealBoundary')).toBe(true);
+    expect(sealed.some((event) => event.type === 'ThresholdSealed')).toBe(true);
+    expect(core.getCapabilities(core.getTab(tabId)!.sessionId, tabId).capabilities.has('CanNetwork')).toBe(false);
+  });
+
+  it('keeps a failed boundary seal closed to new network operations and permits retry', async () => {
+    const engine = new FakeEngineAdapter();
+    const { core, tabId } = await bootWithTab({ engine });
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    await core.dispatch(cmd<OpenBoundary>({ type: 'OpenBoundary', tabId, url: 'https://example.com' }));
+    vi.spyOn(engine, 'sealBoundary').mockRejectedValueOnce(new Error('engine-seal-failed'));
+
+    const failedSeal = await core.dispatch(cmd<CloseBoundary>({ type: 'CloseBoundary', tabId }));
+    expect(failedSeal.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(core.getThreshold(tabId)?.state).toBe('closing');
+    expect(core.getCapabilities(core.getTab(tabId)!.sessionId, tabId).capabilities.has('CanNetwork')).toBe(false);
+
+    const retriedSeal = await core.dispatch(cmd<CloseBoundary>({ type: 'CloseBoundary', tabId }));
+    expect(retriedSeal.some((event) => event.type === 'ThresholdSealed')).toBe(true);
+    expect(core.getThreshold(tabId)?.state).toBe('sealed');
+  });
+
+  it('stops the engine before cancelling an in-flight navigation', async () => {
+    class PendingNavigationEngine extends FakeEngineAdapter {
+      override navigate(): Promise<void> {
+        return Promise.resolve();
+      }
+    }
+    const engine = new PendingNavigationEngine();
+    const { core, calls, tabId } = await bootWithTab({ engine });
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    await core.dispatch(cmd<OpenBoundary>({ type: 'OpenBoundary', tabId, url: 'https://example.com' }));
+    const navigation = await core.dispatch(cmd<Navigate>({ type: 'Navigate', tabId, url: 'https://example.com' }));
+    const navigationId = navigation.find((event) => event.type === 'NavigationRequested')!.navigationId;
+    vi.spyOn(engine, 'stop').mockRejectedValueOnce(new Error('engine-stop-failed'));
+
+    const rejected = await core.dispatch(cmd<StopNavigation>({ type: 'StopNavigation', navigationId }));
+
+    expect(rejected.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(calls.some((call) => call.method === 'stop')).toBe(true);
+    expect(core.getNavigation(navigationId)?.state).toBe('requested');
+  });
+
+  it('keeps overlapping command events in their originating dispatch buffers', async () => {
+    let finishNavigation: (() => void) | undefined;
+    class DeferredNavigationEngine extends FakeEngineAdapter {
+      override navigate(_request: EngineNavigationRequest): Promise<void> {
+        return new Promise((resolve) => { finishNavigation = resolve; });
+      }
+    }
+    const { core, sessionId, tabId } = await bootWithTab({ engine: new DeferredNavigationEngine() });
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    await core.dispatch(cmd<OpenBoundary>({ type: 'OpenBoundary', tabId, url: 'https://example.com' }));
+    const navigationCommand = cmd<Navigate>({ type: 'Navigate', tabId, url: 'https://example.com' });
+    const navigationResult = core.dispatch(navigationCommand);
+    await vi.waitFor(() => expect(finishNavigation).toBeTypeOf('function'));
+
+    const windowCommand = cmd<CreateWindow>({ type: 'CreateWindow', sessionId, width: 800, height: 600 });
+    const windowEvents = await core.dispatch(windowCommand);
+    finishNavigation!();
+    const navigationEvents = await navigationResult;
+
+    expect(windowEvents.length).toBeGreaterThan(0);
+    expect(windowEvents.every((event) => event.commandId === windowCommand.commandId)).toBe(true);
+    expect(navigationEvents.length).toBeGreaterThan(0);
+    expect(navigationEvents.every((event) => event.commandId === navigationCommand.commandId)).toBe(true);
+  });
+
   it('private sessions receive their restricted capability set BY CONSTRUCTION (S3)', async () => {
     const engine = new FakeEngineAdapter();
     const core = new LyconCore(engine, LYCON_IDENTITY_V1);
@@ -294,6 +402,72 @@ describe('Gate 7: Full lifecycle against the fake engine', () => {
     expect('charter' in ctx).toBe(false);
     expect('family' in ctx).toBe(false);
     expect(ctx.sandboxAttributes).not.toContain('allow-same-origin');
+  });
+
+  it('rejects mixed private-tab and persistent-session object graphs', async () => {
+    const { core, sessionId, windowId, tabId } = await bootWithTab();
+
+    const privateTabInPersistentWindow = await core.dispatch(
+      cmd<CreateTab>({ type: 'CreateTab', windowId, typeKind: 'private' })
+    );
+    expect(privateTabInPersistentWindow.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(core.getTabs().some((tab) => tab.type === 'private')).toBe(false);
+
+    const privateSessionEvents = await core.dispatch(
+      cmd<CreateSession>({ type: 'CreateSession', mode: 'private' })
+    );
+    const privateSessionId = privateSessionEvents.find((event) => event.type === 'SessionCreated')!.sessionId;
+    const privateWindowEvents = await core.dispatch(
+      cmd<CreateWindow>({ type: 'CreateWindow', sessionId: privateSessionId, width: 800, height: 600 })
+    );
+    const privateWindowId = privateWindowEvents.find((event) => event.type === 'WindowCreated')!.windowId;
+    const normalTabInPrivateWindow = await core.dispatch(
+      cmd<CreateTab>({ type: 'CreateTab', windowId: privateWindowId, typeKind: 'normal' })
+    );
+    expect(normalTabInPrivateWindow.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(core.getTabs().some((tab) => tab.sessionId === privateSessionId)).toBe(false);
+
+    const validPrivateTab = await core.dispatch(
+      cmd<CreateTab>({ type: 'CreateTab', windowId: privateWindowId, typeKind: 'private' })
+    );
+    const privateTabId = validPrivateTab.find((event) => event.type === 'TabCreated')!.tabId;
+
+    expect(core.getTabs().some((tab) => tab.sessionId === privateSessionId)).toBe(true);
+    expect(() => core.getCapabilities(sessionId, tabId)).not.toThrow();
+    expect(() => core.getCapabilities(sessionId, privateTabId))
+      .toThrow(/does not belong to session/);
+
+    const closed = await core.dispatch(cmd<CloseTab>({ type: 'CloseTab', tabId: privateTabId }));
+    expect(closed.some((event) => event.type === 'SessionDestroyed')).toBe(true);
+    expect(core.getSession(privateSessionId)).toBeUndefined();
+  });
+
+  it('rejects a missing capability before calling the corresponding engine operation', async () => {
+    const identity = {
+      ...LYCON_IDENTITY_V1,
+      capabilities: LYCON_IDENTITY_V1.capabilities.filter((capability) => capability !== 'CanGoBack'),
+    };
+    const { core, calls, tabId } = await bootWithTab({ identity });
+    await core.dispatch(cmd<ActivateTab>({ type: 'ActivateTab', tabId }));
+    await core.dispatch(cmd<Navigate>({ type: 'Navigate', tabId, url: 'lycon://one' }));
+    await core.dispatch(cmd<Navigate>({ type: 'Navigate', tabId, url: 'lycon://two' }));
+
+    const result = await core.dispatch(cmd<GoBack>({ type: 'GoBack', tabId }));
+
+    expect(result.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(calls.some((call) => call.method === 'goBack')).toBe(false);
+  });
+
+  it('rejects invalid window dimensions before changing Core state', async () => {
+    const { core, sessionId } = await bootWithTab();
+    const windowCount = core.getWindows().length;
+
+    const result = await core.dispatch(
+      cmd<CreateWindow>({ type: 'CreateWindow', sessionId, width: -1, height: Number.NaN })
+    );
+
+    expect(result.some((event) => event.type === 'CommandRejected')).toBe(true);
+    expect(core.getWindows()).toHaveLength(windowCount);
   });
 
   it('core suspends (revoking capabilities) and restores-after-suspend', async () => {

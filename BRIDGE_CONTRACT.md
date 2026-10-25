@@ -55,67 +55,67 @@ interface LyconNative {
 
 ## Actions (invoke)
 
-| Action | Payload | Returns | Description |
-|---|---|---|---|
-| `settings:get` | — | `Settings` | Load persisted settings (with defaults applied) |
-| `settings:set` | `Partial<Settings>` | `Settings` | Merge patch into settings, persist, return new value |
-| `search:list` | — | `SearchEngines` | Map of engine key → { name, url, suggest } |
-| `search:build` | `{ engine, query }` | `string` | Build a search URL for the given engine + query |
-| `bookmarks:list` | — | `Bookmark[]` | All bookmarks, newest last |
-| `bookmarks:add` | `Bookmark` | `Bookmark[]` | Add (dedupe by URL), return new list |
-| `bookmarks:remove` | `id: string` | `Bookmark[]` | Remove by id, return new list |
-| `history:list` | — | `HistoryEntry[]` | All visits, newest first |
-| `history:add` | `HistoryEntry` | `HistoryEntry[]` | Add (dedupe consecutive), return new list |
-| `history:remove` | `id: string` | `HistoryEntry[]` | Remove by id |
-| `history:clear` | — | `[]` | Empty the history |
-| `downloads:list` | — | `Download[]` | Last 100 download records |
-| `downloads:open` | `path: string` | `boolean` | Open a downloaded file with the OS default app |
-| `downloads:show` | `path: string` | `boolean` | Reveal the file in the OS file manager |
-| `downloads:clear` | — | `[]` | Empty the downloads list (does NOT delete files on disk) |
-| `shields:toggle` | `enabled: boolean` | `Settings` | Enable/disable ad blocker for the default session |
-| `shields:status` | — | `{ enabled, totalBlocked, blockerLoaded }` | Diagnostic info |
-| `window:minimize` | — | `void` | Minimize the host window |
-| `window:maximize` | — | `void` | Toggle maximize/restore |
-| `window:close` | — | `void` | Close the host window |
-| `local:chooseFile` | — | `{ path, url, name } \| null` | Open a native file picker and return a local file URL |
-| `local:resolvePath` | `{ input: string }` | `string \| null` | Convert a user-entered local path to a file URL |
-| `agents:list` | — | `AgentConnector[]` | List sanitized optional intelligence connections; secrets are never returned |
-| `agents:save` | `AgentConnectorInput` | `AgentConnector` | Validate and persist a local or remote compatible connection |
-| `agents:remove` | `id: string` | `AgentConnector[]` | Remove a connection and its protected credential |
-| `agents:test` | `AgentConnectorInput` | `{ ok, status }` | Explicitly test an endpoint without page context |
-| `agents:request` | `AgentRequest` | `{ text, status }` | Send an explicitly confirmed request through a compatible connection |
-| `agents:audit` | — | `AgentAudit[]` | Return local metadata for outbound intelligence requests |
-| `agents:audit:clear` | — | `[]` | Clear local intelligence request metadata |
-| `shell:openExternal` | `url: string` | `void` | Open a URL in the OS default browser (for external links) |
+| Action               | Payload               | Returns                                    | Description                                                                  |
+| -------------------- | --------------------- | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `settings:get`       | —                     | `Settings`                                 | Load persisted settings (with defaults applied)                              |
+| `settings:set`       | `Partial<Settings>`   | `Settings`                                 | Merge patch into settings, persist, return new value                         |
+| `search:list`        | —                     | `SearchEngines`                            | Map of engine key → { name, url, suggest }                                   |
+| `search:build`       | `{ engine, query }`   | `string`                                   | Build a search URL for the given engine + query                              |
+| `bookmarks:list`     | —                     | `Bookmark[]`                               | All bookmarks, newest last                                                   |
+| `bookmarks:add`      | `Bookmark`            | `Bookmark[]`                               | Add (dedupe by URL), return new list                                         |
+| `bookmarks:remove`   | `id: string`          | `Bookmark[]`                               | Remove by id, return new list                                                |
+| `history:list`       | —                     | `HistoryEntry[]`                           | All visits, newest first                                                     |
+| `history:add`        | `HistoryEntry`        | `HistoryEntry[]`                           | Add (dedupe consecutive), return new list                                    |
+| `history:remove`     | `id: string`          | `HistoryEntry[]`                           | Remove by id                                                                 |
+| `history:clear`      | —                     | `[]`                                       | Empty the history                                                            |
+| `downloads:list`     | —                     | `Download[]`                               | Last 100 download records                                                    |
+| `downloads:open`     | `path: string`        | `boolean`                                  | Open a downloaded file with the OS default app                               |
+| `downloads:show`     | `path: string`        | `boolean`                                  | Reveal the file in the OS file manager                                       |
+| `downloads:clear`    | —                     | `[]`                                       | Empty the downloads list (does NOT delete files on disk)                     |
+| `shields:toggle`     | `enabled: boolean`    | `Settings`                                 | Enable/disable ad blocker for the default session                            |
+| `shields:status`     | —                     | `{ enabled, totalBlocked, blockerLoaded }` | Diagnostic info                                                              |
+| `window:minimize`    | —                     | `void`                                     | Minimize the host window                                                     |
+| `window:maximize`    | —                     | `void`                                     | Toggle maximize/restore                                                      |
+| `window:close`       | —                     | `void`                                     | Close the host window                                                        |
+| `local:chooseFile`   | —                     | `{ path, url, name } \| null`              | Open a native file picker and return a local file URL                        |
+| `local:resolvePath`  | `{ input: string }`   | `string \| null`                           | Convert a user-entered local path to a file URL                              |
+| `agents:list`        | —                     | `AgentConnector[]`                         | List sanitized optional intelligence connections; secrets are never returned |
+| `agents:save`        | `AgentConnectorInput` | `AgentConnector`                           | Validate and persist a local or remote compatible connection                 |
+| `agents:remove`      | `id: string`          | `AgentConnector[]`                         | Remove a connection and its protected credential                             |
+| `agents:test`        | `AgentConnectorInput` | `{ ok, status }`                           | Explicitly test an endpoint without page context                             |
+| `agents:request`     | `AgentRequest`        | `{ text, status }`                         | Send an explicitly confirmed request through a compatible connection         |
+| `agents:audit`       | —                     | `AgentAudit[]`                             | Return local metadata for outbound intelligence requests                     |
+| `agents:audit:clear` | —                     | `[]`                                       | Clear local intelligence request metadata                                    |
+| `shell:openExternal` | `url: string`         | `void`                                     | Open a URL in the OS default browser (for external links)                    |
 
 ## Events (on)
 
-| Event | Payload | When fired |
-|---|---|---|
-| `settings:changed` | `Settings` | After `settings:set` completes — broadcast to all listeners |
-| `shields:blocked` | `{ url, tabId, private, filter }` | Each time the blocker rejects a request. `tabId` is the webContents ID |
-| `downloads:new` | `Download` | A new download starts |
-| `downloads:progress` | `Download` | A download's byte count updates |
-| `downloads:done` | `Download` | A download completes (state = 'completed' or 'interrupted') |
-| `tabs:openRequested` | `{ url }` | A page calls `window.open()` — host should open a new tab |
-| `https:upgraded` | `{ from, to }` | HTTP→HTTPS upgrade fires (only when HTTPS-Only mode is on) |
-| `agents:auditChanged` | `AgentAudit` | A user-initiated connection test or request is recorded locally |
-| `agents:openRequested` | — | A start-page action asks the shell to open the optional intelligence panel |
+| Event                  | Payload                           | When fired                                                                 |
+| ---------------------- | --------------------------------- | -------------------------------------------------------------------------- |
+| `settings:changed`     | `Settings`                        | After `settings:set` completes — broadcast to all listeners                |
+| `shields:blocked`      | `{ url, tabId, private, filter }` | Each time the blocker rejects a request. `tabId` is the webContents ID     |
+| `downloads:new`        | `Download`                        | A new download starts                                                      |
+| `downloads:progress`   | `Download`                        | A download's byte count updates                                            |
+| `downloads:done`       | `Download`                        | A download completes (state = 'completed' or 'interrupted')                |
+| `tabs:openRequested`   | `{ url }`                         | A page calls `window.open()` — host should open a new tab                  |
+| `https:upgraded`       | `{ from, to }`                    | HTTP→HTTPS upgrade fires (only when HTTPS-Only mode is on)                 |
+| `agents:auditChanged`  | `AgentAudit`                      | A user-initiated connection test or request is recorded locally            |
+| `agents:openRequested` | —                                 | A start-page action asks the shell to open the optional intelligence panel |
 
 ## Types
 
 ```typescript
 interface Settings {
-  theme: 'dark' | 'light' | 'system';
-  accent: 'orange' | 'purple' | 'pink';
-  searchEngine: 'duckduckgo' | 'google' | 'bing' | 'startpage';
+  theme: "dark" | "light" | "system";
+  accent: "orange" | "purple" | "pink";
+  searchEngine: "duckduckgo" | "google" | "bing" | "startpage";
   shieldsEnabled: boolean;
-  startupPage: 'startpage' | 'blank';
+  startupPage: "startpage" | "blank";
   privateTabDefault: boolean;
   httpsOnly: boolean;
-  sensitivity: 'hardened' | 'balanced' | 'permissive';
+  sensitivity: "hardened" | "balanced" | "permissive";
   agentDefaultConnectorId: string;
-  siteSensitivity: { [origin: string]: 'hardened' | 'balanced' | 'permissive' };
+  siteSensitivity: { [origin: string]: "hardened" | "balanced" | "permissive" };
 }
 
 interface SearchEngines {
@@ -144,7 +144,7 @@ interface Download {
   savePath: string;
   total: number; // bytes
   received: number; // bytes
-  state: 'progressing' | 'completed' | 'interrupted' | 'cancelled';
+  state: "progressing" | "completed" | "interrupted" | "cancelled";
   startTime: number;
   endTime?: number;
   private?: boolean;
@@ -159,12 +159,12 @@ interface LocalFile {
 interface AgentConnector {
   id: string;
   name: string;
-  location: 'local' | 'remote';
-  protocol: 'openai-chat';
+  location: "local" | "remote";
+  protocol: "openai-chat";
   endpoint: string;
   model?: string;
   enabled: boolean;
-  contextScopes: ('none' | 'selection' | 'page' | 'tab' | 'localFile')[];
+  contextScopes: ("none" | "selection" | "page" | "tab" | "localFile")[];
   createdAt: number;
   updatedAt: number;
 }
@@ -176,7 +176,7 @@ interface AgentConnectorInput extends Partial<AgentConnector> {
 interface AgentRequest {
   connectorId: string;
   prompt: string;
-  scope: 'none' | 'selection' | 'page' | 'tab' | 'localFile';
+  scope: "none" | "selection" | "page" | "tab" | "localFile";
   contextText?: string;
   page?: { title?: string; url?: string };
   confirmed: true; // native hosts must reject requests without explicit confirmation
@@ -189,7 +189,7 @@ interface AgentAudit {
   connectorName: string;
   destination: string;
   scope: string;
-  state: 'tested' | 'completed' | 'failed';
+  state: "tested" | "completed" | "failed";
   status?: number;
   error?: string;
 }

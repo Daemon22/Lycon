@@ -12,6 +12,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write .",
+    "db:connections:check": "tsx scripts/check-database-connections.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
@@ -70,6 +71,7 @@
     "mysql2": "^3.15.0",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
+    "pg": "^8.23.1",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",
     "react-dom": "^19.2.1",
@@ -95,6 +97,7 @@
     "@types/express": "4.17.21",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^24.7.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",

@@ -152,23 +152,41 @@ const NORMAL_SANDBOX: readonly string[] = ['allow-scripts', 'allow-same-origin',
 const PRIVATE_SANDBOX: readonly string[] = ['allow-scripts', 'allow-forms']; // no same-origin for private
 
 /** Classify a URL into a (PageKind, ViewType) — the Core's authority, not the engine's. */
-function classifyUrl(url: string): { kind: PageKind; view: ViewType | null } {
-  if (url.startsWith('about:')) return { kind: 'local', view: 'start' };
-  if (url.startsWith('lycos://search')) return { kind: 'search', view: 'search' };
-  if (url.startsWith('lycos://history')) return { kind: 'local', view: 'history' };
-  if (url.startsWith('lycos://bookmarks')) return { kind: 'local', view: 'bookmarks' };
-  if (url.startsWith('lycos://downloads')) return { kind: 'local', view: 'downloads' };
-  if (url.startsWith('lycos://settings')) return { kind: 'local', view: 'settings' };
-  if (url.startsWith('file://')) return { kind: 'file', view: null };
+function classifyUrl(url: string): { kind: PageKind; view: ViewType | null } | null {
+  if (typeof url !== 'string' || url.trim() !== url || url.length === 0) return null;
   try {
     const u = new URL(url);
     if (u.protocol === 'http:' || u.protocol === 'https:') {
       return { kind: 'online', view: 'online' };
     }
-    return { kind: 'local', view: null };
+    if (u.protocol === 'file:') return { kind: 'file', view: null };
+    if (u.protocol === 'about:' && ['blank', 'start'].includes(u.pathname)) {
+      return { kind: 'local', view: 'start' };
+    }
+    if (u.protocol === 'lycon:') {
+      const localViews: Record<string, ViewType> = {
+        start: 'start',
+        search: 'search',
+        history: 'history',
+        bookmarks: 'bookmarks',
+        downloads: 'downloads',
+        settings: 'settings',
+      };
+      const view = localViews[u.hostname];
+      if (view) return { kind: view === 'search' ? 'search' : 'local', view };
+    }
+    return null;
   } catch {
-    return { kind: 'local', view: null };
+    return null;
   }
+}
+
+function isValidWindowDimension(value: number): boolean {
+  return Number.isFinite(value) && value > 0;
+}
+
+function isValidWindowPosition(value: number): boolean {
+  return Number.isFinite(value);
 }
 
 // ── Snapshot / redacted-identity (S11) ──────────────────────────────────
@@ -214,6 +232,7 @@ export class LyconCore {
   private sessions = new Map<SessionId, GSession>();
   private windows = new Map<WindowId, GWindow>();
   private tabs = new Map<TabId, GTab>();
+  private privateTabIds = new Set<TabId>();
   private readonly pageIndex = new Map<PageId, Page>();
   private navigations = new Map<NavigationId, GNavigation>();
   private thresholds = new Map<TabId, GThreshold>();
@@ -227,6 +246,7 @@ export class LyconCore {
   private eventStream: CoreEvent[] = [];
   private causality = 0;
   private activeBuffer: CoreEvent[] | null = null;
+  private commandBuffers = new Map<CommandId, CoreEvent[]>();
   private listeners = new Set<(e: CoreEvent) => void>();
 
   /** The commandId used for identity / core lifecycle events (boot has no surface issuer). */
@@ -334,42 +354,59 @@ export class LyconCore {
    * Command (including any emitted synchronously by engine-signal translation).
    */
   async dispatch(cmd: Command): Promise<CoreEvent[]> {
+    const candidate = cmd as unknown;
+    const raw = candidate && typeof candidate === 'object'
+      ? candidate as Record<string, unknown>
+      : {};
+    const commandId = typeof raw.commandId === 'string' && raw.commandId.trim()
+      ? raw.commandId as CommandId
+      : Id.command();
+    const commandType = typeof raw.type === 'string' ? raw.type : 'Unknown';
     const buffer: CoreEvent[] = [];
-    this.activeBuffer = buffer;
-
-    // Article IX: non-impersonation (S5).
-    if (isForbiddenParticipant(cmd.participantId)) {
-      this.reject(cmd.commandId, cmd.type, `non-impersonation: participant "${cmd.participantId}" may not act as Lycon core`);
-      this.activeBuffer = null;
-      return buffer;
-    }
-    if (cmd.type === 'ResumeCore') {
-      if (this.browserState !== 'suspended') {
-        this.reject(cmd.commandId, cmd.type, `resume-not-allowed (state=${this.browserState})`);
-        this.activeBuffer = null;
+    this.commandBuffers.set(commandId, buffer);
+    try {
+      if (!candidate || typeof candidate !== 'object'
+        || typeof raw.commandId !== 'string' || !raw.commandId.trim()
+        || typeof raw.type !== 'string' || !raw.type.trim()
+        || typeof raw.participantId !== 'string' || !raw.participantId.trim()
+        || typeof raw.timestamp !== 'number' || !Number.isFinite(raw.timestamp)) {
+        this.reject(commandId, commandType, 'malformed-command-envelope');
         return buffer;
       }
-    } else if (this.browserState !== 'running') {
-      this.reject(cmd.commandId, cmd.type, `core-not-running (state=${this.browserState})`);
-      this.activeBuffer = null;
+      // Article IX: non-impersonation (S5).
+      if (isForbiddenParticipant(cmd.participantId)) {
+        this.reject(cmd.commandId, cmd.type, `non-impersonation: participant "${cmd.participantId}" may not act as Lycon core`);
+        return buffer;
+      }
+      if (cmd.type === 'ResumeCore') {
+        if (this.browserState !== 'suspended') {
+          this.reject(cmd.commandId, cmd.type, `resume-not-allowed (state=${this.browserState})`);
+          return buffer;
+        }
+      } else if (this.browserState !== 'running') {
+        this.reject(cmd.commandId, cmd.type, `core-not-running (state=${this.browserState})`);
+        return buffer;
+      }
+      if (!this.identity) {
+        this.reject(cmd.commandId, cmd.type, 'identity-not-restored');
+        return buffer;
+      }
+
+      const from = buffer.length;
+      try {
+        await this.handleCommand(cmd);
+      } catch {
+        this.reject(cmd.commandId, cmd.type, 'operation-failed');
+      }
+
+      // Article III: a Command without an Event is a rumor. Guarantee ≥1 event.
+      if (buffer.length === from) {
+        this.reject(cmd.commandId, cmd.type, 'command produced no event');
+      }
       return buffer;
+    } finally {
+      this.commandBuffers.delete(commandId);
     }
-    if (!this.identity) {
-      this.reject(cmd.commandId, cmd.type, 'identity-not-restored');
-      this.activeBuffer = null;
-      return buffer;
-    }
-
-    const from = buffer.length;
-    await this.handleCommand(cmd);
-
-    // Article III: a Command without an Event is a rumor. Guarantee ≥1 event.
-    if (buffer.length === from) {
-      this.reject(cmd.commandId, cmd.type, 'command produced no event');
-    }
-
-    this.activeBuffer = null;
-    return buffer;
   }
 
   private async handleCommand(cmd: Command): Promise<void> {
@@ -397,12 +434,12 @@ export class LyconCore {
       case 'Navigate': await this.navigate(cmd); break;
       case 'GoBack': await this.goBack(cmd); break;
       case 'GoForward': await this.goForward(cmd); break;
-      case 'StopNavigation': this.stopNavigation(cmd); break;
+      case 'StopNavigation': await this.stopNavigation(cmd); break;
       case 'Reload': await this.reload(cmd); break;
 
       // ── Boundary ──
       case 'OpenBoundary': this.openBoundary(cmd); break;
-      case 'CloseBoundary': this.closeBoundary(cmd); break;
+      case 'CloseBoundary': await this.closeBoundary(cmd); break;
 
       // ── Agents (Family registry — no rank, Article VII / Article IX) ──
       case 'RegisterAgent': this.registerAgent(cmd); break;
@@ -472,6 +509,15 @@ export class LyconCore {
   private createWindow(cmd: CreateWindow): void {
     const session = this.sessions.get(cmd.sessionId);
     if (!session) { this.reject(cmd.commandId, cmd.type, 'no such session'); return; }
+    if (!isValidWindowDimension(cmd.width) || !isValidWindowDimension(cmd.height)) {
+      this.reject(cmd.commandId, cmd.type, 'invalid-window-dimensions');
+      return;
+    }
+    if ((cmd.x !== undefined && !isValidWindowPosition(cmd.x)) || (cmd.y !== undefined && !isValidWindowPosition(cmd.y))) {
+      this.reject(cmd.commandId, cmd.type, 'invalid-window-position');
+      return;
+    }
+
     const win: GWindow = {
       id: Id.window(),
       sessionId: session.id,
@@ -507,6 +553,14 @@ export class LyconCore {
   private resizeWindow(cmd: ResizeWindow): void {
     const win = this.windows.get(cmd.windowId);
     if (!win) { this.reject(cmd.commandId, cmd.type, 'no such window'); return; }
+    if (!isValidWindowDimension(cmd.width) || !isValidWindowDimension(cmd.height)) {
+      this.reject(cmd.commandId, cmd.type, 'invalid-window-dimensions');
+      return;
+    }
+    if ((cmd.x !== undefined && !isValidWindowPosition(cmd.x)) || (cmd.y !== undefined && !isValidWindowPosition(cmd.y))) {
+      this.reject(cmd.commandId, cmd.type, 'invalid-window-position');
+      return;
+    }
     win.width = cmd.width;
     win.height = cmd.height;
     win.x = cmd.x ?? win.x;
@@ -527,6 +581,20 @@ export class LyconCore {
     if (!win) { this.reject(cmd.commandId, cmd.type, 'no such window'); return; }
     const session = this.sessions.get(win.sessionId);
     if (!session) { this.reject(cmd.commandId, cmd.type, 'no such session'); return; }
+    if ((session.mode === 'private') !== (cmd.typeKind === 'private')) {
+      this.reject(cmd.commandId, cmd.type, 'tab-type-session-mode-mismatch');
+      return;
+    }
+    const initialLocation = cmd.initialUrl === undefined ? null : classifyUrl(cmd.initialUrl);
+    if (cmd.initialUrl !== undefined && !initialLocation) {
+      this.reject(cmd.commandId, cmd.type, 'unsupported-navigation-url');
+      return;
+    }
+    if (initialLocation?.kind === 'online'
+      && session.mode === 'private' && this.adapter?.capabilities.canIsolatePrivateSessions !== true) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
 
     const now = Date.now();
     const tab: GTab = {
@@ -544,6 +612,7 @@ export class LyconCore {
       engineAttached: false,
     };
     this.tabs.set(tab.id, tab);
+    if (tab.type === 'private') this.privateTabIds.add(tab.id);
     this.thresholds.set(tab.id, this.defaultThreshold(tab.id));
     win.tabIds.push(tab.id);
     win.activeTabId = win.activeTabId ?? tab.id;
@@ -576,7 +645,7 @@ export class LyconCore {
       // The Core classifies the intent (URL vs query) — never the engine or
       // the surface. A tab is born den-local; online content still requires
       // the OpenBoundary handoff before it can load.
-      const { kind, view } = classifyUrl(cmd.initialUrl);
+      const { kind, view } = initialLocation!;
       await this.doNavigate(tab, cmd.initialUrl, kind, view, false, cmd.commandId);
     }
   }
@@ -584,40 +653,112 @@ export class LyconCore {
   private async activateTab(cmd: ActivateTab): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
-    if (!isValidTabTransition(tab.lifecycle, 'active')) {
+    const win = this.windows.get(tab.windowId);
+    const session = this.sessions.get(tab.sessionId);
+    if (!win || !session) { this.reject(cmd.commandId, cmd.type, 'tab context is incomplete'); return; }
+    if (tab.lifecycle !== 'active' && !isValidTabTransition(tab.lifecycle, 'active')) {
       this.reject(cmd.commandId, cmd.type, `invalid tab lifecycle transition: ${tab.lifecycle} → active`);
       return;
     }
-    const prevLifecycle = tab.lifecycle;
-    tab.lifecycle = 'active';
-    this.emit({ ...this.base(cmd.commandId), type: 'TabActivated', tabId: tab.id });
-    this.emit({
-      ...this.base(cmd.commandId),
-      type: 'TabStateChanged',
-      tabId: tab.id,
-      from: prevLifecycle,
-      to: 'active',
-    });
 
-    // Lazy engine attach (Article II, Paragraph 4): attach only when visible.
-    await this.attachEngine(tab);
+    const otherActiveTabs = [...this.tabs.values()].filter((candidate) =>
+      candidate.lifecycle === 'active' && candidate.id !== tab.id
+    );
+    if (otherActiveTabs.length > 1) {
+      this.reject(cmd.commandId, cmd.type, 'multiple-tabs-marked-active');
+      return;
+    }
+    const previousTab = otherActiveTabs[0];
+    const previousSessionId = this.browser!.activeSessionId;
+    const previousSession = previousSessionId ? this.sessions.get(previousSessionId) : undefined;
+    const previousWindowId = previousSession?.activeWindowId ?? null;
+    const previousWindow = previousWindowId ? this.windows.get(previousWindowId) : undefined;
+    const previousTabId = previousWindow?.activeTabId ?? null;
+    const previousLifecycle = tab.lifecycle;
+
+    this.browser!.activeSessionId = session.id;
+    session.activeWindowId = win.id;
+    session.lastActiveAt = Date.now();
+    win.activeTabId = tab.id;
+    tab.lifecycle = 'active';
+
+    const targetWasAttached = tab.engineAttached;
+    try {
+      await this.attachEngine(tab);
+    } catch {
+      tab.lifecycle = previousLifecycle;
+      this.browser!.activeSessionId = previousSessionId;
+      if (previousSession && previousWindowId) previousSession.activeWindowId = previousWindowId;
+      if (previousWindow && previousTabId) previousWindow.activeTabId = previousTabId;
+      if (!targetWasAttached && tab.engineAttached && this.adapter) {
+        try { await this.adapter.detach(tab.id); } catch { /* preserve the primary attach failure */ }
+        tab.engineAttached = false;
+      }
+      this.reject(cmd.commandId, cmd.type, 'engine-attach-failed');
+      return;
+    }
+
+    if (previousTab?.engineAttached && this.adapter) {
+      try {
+        await this.adapter.detach(previousTab.id);
+      } catch {
+        if (!targetWasAttached && tab.engineAttached) {
+          try { await this.adapter.detach(tab.id); } catch { /* preserve the primary detach failure */ }
+          tab.engineAttached = false;
+        }
+        tab.lifecycle = previousLifecycle;
+        this.browser!.activeSessionId = previousSessionId;
+        if (previousSession && previousWindowId) previousSession.activeWindowId = previousWindowId;
+        if (previousWindow && previousTabId) previousWindow.activeTabId = previousTabId;
+        this.reject(cmd.commandId, cmd.type, 'engine-detach-failed');
+        return;
+      }
+      previousTab.engineAttached = false;
+    }
+
+    if (previousTab) {
+      previousTab.lifecycle = 'inactive';
+      this.emit({
+        ...this.base(cmd.commandId),
+        type: 'TabStateChanged',
+        tabId: previousTab.id,
+        from: 'active',
+        to: 'inactive',
+      });
+    }
+    this.emit({ ...this.base(cmd.commandId), type: 'TabActivated', tabId: tab.id });
+    if (previousLifecycle !== 'active') {
+      this.emit({
+        ...this.base(cmd.commandId),
+        type: 'TabStateChanged',
+        tabId: tab.id,
+        from: previousLifecycle,
+        to: 'active',
+      });
+    }
   }
 
   private async closeTab(cmd: CloseTab): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
+    const session = this.sessions.get(tab.sessionId);
     if (!isValidTabTransition(tab.lifecycle, 'destroyed')) {
       this.reject(cmd.commandId, cmd.type, `invalid tab lifecycle transition: ${tab.lifecycle} → destroyed`);
       return;
     }
     const prevLifecycle = tab.lifecycle;
-    tab.lifecycle = 'destroyed';
 
     // Detach the engine (release all resources for this tab — Article II).
     if (tab.engineAttached && this.adapter) {
-      await this.adapter.detach(tab.id);
-      tab.engineAttached = false;
+      try {
+        await this.adapter.detach(tab.id);
+      } catch {
+        this.reject(cmd.commandId, cmd.type, 'engine-detach-failed');
+        return;
+      }
     }
+    tab.engineAttached = false;
+    tab.lifecycle = 'destroyed';
     this.thresholds.delete(tab.id);
     this.navigations.forEach((n) => { if (n.tabId === tab.id) this.navigations.delete(n.id); });
     this.pageIndex.forEach((p, pageId) => {
@@ -641,6 +782,29 @@ export class LyconCore {
       from: prevLifecycle,
       to: 'destroyed',
     });
+
+    if (session?.mode === 'private' && ![...this.tabs.values()].some((openTab) => openTab.sessionId === session.id)) {
+      this.destroyEmptyPrivateSession(session, cmd.commandId);
+    }
+  }
+
+  private destroyEmptyPrivateSession(session: GSession, commandId: CommandId): void {
+    if (session.mode !== 'private') return;
+    const windows = session.windowIds
+      .map((windowId) => this.windows.get(windowId))
+      .filter((window): window is GWindow => window !== undefined);
+    if (windows.some((window) => window.tabIds.length > 0)) return;
+
+    for (const window of windows) {
+      this.windows.delete(window.id);
+      this.emit({ ...this.base(commandId), type: 'WindowClosed', windowId: window.id });
+    }
+    this.sessions.delete(session.id);
+    this.browser!.sessionIds = this.browser!.sessionIds.filter((sessionId) => sessionId !== session.id);
+    if (this.browser!.activeSessionId === session.id) {
+      this.browser!.activeSessionId = this.browser!.sessionIds[0] ?? null;
+    }
+    this.emit({ ...this.base(commandId), type: 'SessionDestroyed', sessionId: session.id });
   }
 
   // ── Navigation ────────────────────────────────────────────────────────
@@ -653,8 +817,17 @@ export class LyconCore {
       this.reject(cmd.commandId, cmd.type, 'capability-not-present: CanNavigate');
       return;
     }
-    const { kind, view } = classifyUrl(cmd.url);
+    const location = classifyUrl(cmd.url);
+    if (!location) {
+      this.reject(cmd.commandId, cmd.type, 'unsupported-navigation-url');
+      return;
+    }
+    const { kind, view } = location;
     // Online resources require an open boundary (Article IV).
+    if (kind === 'online' && !this.canLoadPrivateOnline(tab)) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
     if (kind === 'online' && !CapabilityResolver.checkCapability(caps, 'CanNetwork')) {
       this.reject(cmd.commandId, cmd.type, 'capability-not-present: CanNetwork (threshold sealed)');
       return;
@@ -665,6 +838,7 @@ export class LyconCore {
   private async goBack(cmd: GoBack): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
+    if (!this.requireTabCapability(cmd, tab, 'CanGoBack')) return;
     if (tab.pageIds.length === 0 || tab.activePageIndex <= 0) {
       this.reject(cmd.commandId, cmd.type, 'no history to go back to');
       return;
@@ -672,12 +846,17 @@ export class LyconCore {
     const targetIndex = tab.activePageIndex - 1;
     const targetPage = this.pageIndex.get(tab.pageIds[targetIndex]);
     if (!targetPage) { this.reject(cmd.commandId, cmd.type, 'no target page'); return; }
+    if (targetPage.kind === 'online' && !this.canLoadPrivateOnline(tab)) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
     await this.doHistoryNav(tab, targetPage, targetIndex, 'back', cmd.commandId);
   }
 
   private async goForward(cmd: GoForward): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
+    if (!this.requireTabCapability(cmd, tab, 'CanGoForward')) return;
     if (tab.pageIds.length === 0 || tab.activePageIndex >= tab.pageIds.length - 1) {
       this.reject(cmd.commandId, cmd.type, 'no history to go forward to');
       return;
@@ -685,6 +864,10 @@ export class LyconCore {
     const targetIndex = tab.activePageIndex + 1;
     const targetPage = this.pageIndex.get(tab.pageIds[targetIndex]);
     if (!targetPage) { this.reject(cmd.commandId, cmd.type, 'no target page'); return; }
+    if (targetPage.kind === 'online' && !this.canLoadPrivateOnline(tab)) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
     await this.doHistoryNav(tab, targetPage, targetIndex, 'forward', cmd.commandId);
   }
 
@@ -846,21 +1029,36 @@ export class LyconCore {
     this.onEngineCompleted(nav, { type: 'EngineNavigationCompleted', tabId: nav.tabId, url, statusCode });
   }
 
-  private stopNavigation(cmd: StopNavigation): void {
+  private async stopNavigation(cmd: StopNavigation): Promise<void> {
     const nav = this.navigations.get(cmd.navigationId);
     if (!nav) { this.reject(cmd.commandId, cmd.type, 'no such navigation'); return; }
     if (isTerminalNavigationState(nav.state)) {
       this.reject(cmd.commandId, cmd.type, `cannot stop a terminal navigation (${nav.state})`);
       return;
     }
+    const tab = this.tabs.get(nav.tabId);
+    if (!tab) { this.reject(cmd.commandId, cmd.type, 'navigation tab no longer exists'); return; }
+    if (!CapabilityResolver.checkCapability(this.capabilitiesFor(tab), 'CanStopNavigation')) {
+      this.reject(cmd.commandId, cmd.type, 'capability-not-present: CanStopNavigation');
+      return;
+    }
     if (!isValidNavigationTransition(nav.state, 'cancelled')) {
       this.reject(cmd.commandId, cmd.type, `invalid navigation transition: ${nav.state} → cancelled`);
+      return;
+    }
+    try {
+      if (tab.engineAttached && this.adapter) await this.adapter.stop(tab.id);
+    } catch {
+      this.reject(cmd.commandId, cmd.type, 'engine-stop-failed');
+      return;
+    }
+    if (isTerminalNavigationState(nav.state)) {
+      this.reject(cmd.commandId, cmd.type, `cannot stop a terminal navigation (${nav.state})`);
       return;
     }
     const from = nav.state;
     nav.state = 'cancelled';
     nav.cancelledAt = Date.now();
-    const tab = this.tabs.get(nav.tabId);
     if (tab && tab.pendingNavigationId === nav.id) tab.pendingNavigationId = null;
     this.emit({ ...this.base(cmd.commandId), type: 'NavigationCancelled', navigationId: nav.id, tabId: nav.tabId, url: nav.targetUrl });
     this.emit({ ...this.base(cmd.commandId), type: 'NavigationStateChanged', navigationId: nav.id, from, to: 'cancelled' });
@@ -869,8 +1067,13 @@ export class LyconCore {
   private async reload(cmd: Reload): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
+    if (!this.requireTabCapability(cmd, tab, 'CanReload')) return;
     const page = tab.activePageIndex >= 0 ? this.pageIndex.get(tab.pageIds[tab.activePageIndex]) : undefined;
     if (!page) { this.reject(cmd.commandId, cmd.type, 'no current page'); return; }
+    if (page.kind === 'online' && !this.canLoadPrivateOnline(tab)) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
     await this.doNavigate(tab, page.url, page.kind, page.viewType, true, cmd.commandId);
   }
 
@@ -883,6 +1086,14 @@ export class LyconCore {
   private openBoundary(cmd: OpenBoundary): void {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
+    if (classifyUrl(cmd.url)?.kind !== 'online') {
+      this.reject(cmd.commandId, cmd.type, 'boundary-requires-online-url');
+      return;
+    }
+    if (!this.canLoadPrivateOnline(tab)) {
+      this.reject(cmd.commandId, cmd.type, 'private-engine-isolation-unavailable');
+      return;
+    }
     const th = this.thresholds.get(cmd.tabId) ?? this.defaultThreshold(cmd.tabId);
     if (th.state !== 'sealed') {
       this.reject(cmd.commandId, cmd.type, `cannot open boundary from state ${th.state}`);
@@ -907,19 +1118,29 @@ export class LyconCore {
     this.thresholds.set(cmd.tabId, th);
   }
 
-  private closeBoundary(cmd: CloseBoundary): void {
+  private async closeBoundary(cmd: CloseBoundary): Promise<void> {
     const tab = this.tabs.get(cmd.tabId);
     if (!tab) { this.reject(cmd.commandId, cmd.type, 'no such tab'); return; }
     const th = this.thresholds.get(cmd.tabId);
-    if (!th || th.state !== 'open') {
+    if (!th || (th.state !== 'open' && th.state !== 'closing')) {
       this.reject(cmd.commandId, cmd.type, 'boundary is not open');
       return;
     }
-    // open → closing → sealed (closing MUST revoke external caps — Article IV)
-    th.state = 'closing';
-    this.emit({ ...this.base(cmd.commandId), type: 'ThresholdClosing', tabId: tab.id, reason: 'user' });
-
+    const wasOpen = th.state === 'open';
+    if (wasOpen) {
+      th.state = 'closing';
+      this.thresholds.set(cmd.tabId, th);
+      this.emit({ ...this.base(cmd.commandId), type: 'ThresholdClosing', tabId: tab.id, reason: 'user' });
+    }
     const before = this.capsSetFor(tab, 'open');
+    try {
+      if (tab.engineAttached && this.adapter) await this.adapter.sealBoundary(tab.id);
+    } catch {
+      this.reject(cmd.commandId, cmd.type, 'engine-boundary-seal-failed');
+      return;
+    }
+
+    // The adapter has unloaded the online document before Core reports sealing.
     th.state = 'sealed';
     th.openedAt = null;
     th.openSince = null;
@@ -956,7 +1177,7 @@ export class LyconCore {
     if (!session) return;
     const caps = this.capabilitiesFor(tab, session);
     if (!CapabilityResolver.checkCapability(caps, 'CanAttachEngine')) {
-      return; // boundary in transition or browser not running
+      throw new Error('capability-not-present: CanAttachEngine');
     }
     const th = this.thresholds.get(tab.id) ?? this.defaultThreshold(tab.id);
     const ctx: EngineContext = {
@@ -1034,6 +1255,10 @@ export class LyconCore {
   private registerAgent(cmd: RegisterAgent): void {
     // Article VII (no rank) + Article IX + Shield S9 (checkDomain guards
     // territory before any cross-domain action).
+    if (!CapabilityResolver.checkCapability(this.capabilitiesFor(undefined), 'CanUseAgents')) {
+      this.reject(cmd.commandId, cmd.type, 'capability-not-present: CanUseAgents');
+      return;
+    }
     if (!checkDomain(this.identity!, cmd.domain)) {
       this.reject(cmd.commandId, cmd.type, `checkDomain: agent "${cmd.agentName}" cannot operate in domain "${cmd.domain}"`);
       return;
@@ -1047,6 +1272,10 @@ export class LyconCore {
   }
 
   private unregisterAgent(cmd: UnregisterAgent): void {
+    if (!CapabilityResolver.checkCapability(this.capabilitiesFor(undefined), 'CanUseAgents')) {
+      this.reject(cmd.commandId, cmd.type, 'capability-not-present: CanUseAgents');
+      return;
+    }
     this.emit({
       ...this.base(cmd.commandId),
       type: 'AgentUnregistered',
@@ -1178,6 +1407,19 @@ export class LyconCore {
     });
   }
 
+  private requireTabCapability(cmd: Command, tab: GTab, capability: Capability): boolean {
+    if (CapabilityResolver.checkCapability(this.capabilitiesFor(tab), capability)) return true;
+    this.reject(cmd.commandId, cmd.type, `capability-not-present: ${capability}`);
+    return false;
+  }
+
+  private canLoadPrivateOnline(tab: GTab): boolean {
+    const session = this.sessions.get(tab.sessionId);
+    if (!session) return false;
+    if (session.mode !== 'private' && tab.type !== 'private') return true;
+    return this.adapter?.capabilities.canIsolatePrivateSessions === true;
+  }
+
   private capsSetFor(tab: GTab, thresholdState: ThresholdState): Set<Capability> {
     const session = this.sessions.get(tab.sessionId);
     return new Set(
@@ -1205,9 +1447,30 @@ export class LyconCore {
 
   private emit(event: CoreEvent): void {
     const frozen = Object.freeze(event) as CoreEvent;
-    this.eventStream.push(frozen);
-    if (this.activeBuffer) this.activeBuffer.push(frozen);
+    this.eventStream.push(this.redactPrivateEvent(frozen));
+    if (this.activeBuffer && frozen.commandId === this.bootCommandId) this.activeBuffer.push(frozen);
+    this.commandBuffers.get(frozen.commandId)?.push(frozen);
     for (const l of [...this.listeners]) l(frozen);
+  }
+
+  private redactPrivateEvent(event: CoreEvent): CoreEvent {
+    if (!('tabId' in event) || !this.privateTabIds.has(event.tabId)) return event;
+
+    switch (event.type) {
+      case 'NavigationRequested':
+      case 'NavigationCancelled':
+      case 'ThresholdOpening':
+      case 'ThresholdOpened':
+        return Object.freeze({ ...event, url: '[private]' });
+      case 'NavigationFailed':
+        return Object.freeze({ ...event, url: '[private]', errorMessage: '[private] navigation failed' });
+      case 'NavigationStarted':
+        return Object.freeze({ ...event, engineUrl: '[private]' });
+      case 'NavigationCompleted':
+        return Object.freeze({ ...event, finalUrl: '[private]' });
+      default:
+        return event;
+    }
   }
 
   private reject(commandId: CommandId, commandType: string, reason: string): void {
@@ -1327,6 +1590,7 @@ export class LyconCore {
     if (tabId) {
       const tab = this.tabs.get(tabId);
       if (!tab) throw new Error(`no such tab: ${String(tabId)}`);
+      if (tab.sessionId !== session.id) throw new Error(`tab ${String(tabId)} does not belong to session ${String(sessionId)}`);
       return this.capabilitiesFor(tab, session);
     }
     return CapabilityResolver.resolve({

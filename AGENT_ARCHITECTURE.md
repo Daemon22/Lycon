@@ -35,11 +35,11 @@ The default scope is `selection`. If there is no selection, Lycon does not silen
 
 ## Sensitivity postures
 
-| Posture | Intended use | Default controls |
-|---|---|---|
-| Hardened | Unknown or hostile sites | Shields on, HTTPS-only, permission prompts, no implicit agent context, local-only connector preference; remote page/local-file context is blocked |
-| Balanced | Normal browsing | Shields on, HTTPS-only, explicit context confirmation, permission prompts |
-| Permissive | Trusted development environments | User-controlled exceptions for localhost and selected sites; remote endpoints still require HTTPS and context still requires an explicit action |
+| Posture    | Intended use                     | Default controls                                                                                                                                  |
+| ---------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hardened   | Unknown or hostile sites         | Shields on, HTTPS-only, permission prompts, no implicit agent context, local-only connector preference; remote page/local-file context is blocked |
+| Balanced   | Normal browsing                  | Shields on, HTTPS-only, explicit context confirmation, permission prompts                                                                         |
+| Permissive | Trusted development environments | User-controlled exceptions for localhost and selected sites; remote endpoints still require HTTPS and context still requires an explicit action   |
 
 Changing posture does not silently send data or enable an agent. Site/session overrides are stored locally and can be cleared.
 

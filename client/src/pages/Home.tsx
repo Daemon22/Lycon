@@ -4,7 +4,7 @@ import { Monitor, Share2, Smartphone, Square, Video } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { startLogin } from "@/const";
 import { syncIndicatorKind } from "@/lib/syncStatus";
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import html2canvas from "html2canvas";
 import { SOUTH_AFRICAN_ENGLISH, VOSK_CATALOG as voskCatalog, interpretSpeechAvailability, normalizeVoiceLanguage } from "@/lib/voice";
 import { useLyconCore } from "@/core/useLyconCore";
@@ -12,6 +12,7 @@ import { syncNativeShields, listAgents, registerAgent as nativeRegisterAgent, un
 import { Id, type TabId } from "../../../core/types/00_ids";
 import type { CoreEvent } from "../../../core/types/04_events";
 import type { Command } from "../../../core/types/03_commands";
+import { historyWithoutPrivateUrls, persistentSessionRecords, persistentTabs, privateTabHistoryUrls, writePersistentValue } from "@/core/privateSessionData";
 import {
   ArrowLeft,
   ArrowRight,
@@ -101,7 +102,8 @@ type DownloadItem = {
 
 type BackupPayload = {
   format: "lycon-local-backup";
-  version: 1;
+  version: 2;
+  privacyScope: "persistent-only";
   exportedAt: string;
   bookmarks: BookmarkItem[];
   history: HistoryItem[];
@@ -168,22 +170,65 @@ function readStorage<T>(key: string, fallback: T): T {
   }
 }
 
+function storedTabs(): Tab[] {
+  const value = readStorage<Tab[]>("lycon-tabs", initialTabs);
+  return Array.isArray(value) ? value.filter(isTabItem) : initialTabs;
+}
+
+function persistentActiveTabId(): TabId {
+  const tabs = persistentTabs(storedTabs());
+  const storedId = readStorage<TabId>("lycon-active-tab", INITIAL_TAB_ID);
+  return tabs.some((tab) => tab.id === storedId) ? storedId : tabs[0]?.id ?? INITIAL_TAB_ID;
+}
+
+function isPageRecord(item: unknown): item is PageRecord {
+  if (!item || typeof item !== "object") return false;
+  const page = item as Partial<PageRecord>;
+  return typeof page.title === "string"
+    && typeof page.url === "string"
+    && ["local", "online", "search", "file"].includes(page.kind ?? "")
+    && (page.view === undefined || ["start", "search", "bookmarks", "history", "downloads", "settings", "online"].includes(page.view))
+    && (page.query === undefined || typeof page.query === "string")
+    && (page.favicon === undefined || typeof page.favicon === "string");
+}
+
+function isTabItem(item: unknown): item is Tab {
+  if (!item || typeof item !== "object") return false;
+  const tab = item as Partial<Tab>;
+  return typeof tab.id === "string"
+    && typeof tab.title === "string"
+    && typeof tab.isPrivate === "boolean"
+    && Array.isArray(tab.history)
+    && tab.history.length > 0
+    && tab.history.every(isPageRecord)
+    && typeof tab.historyIndex === "number"
+    && Number.isInteger(tab.historyIndex)
+    && tab.historyIndex >= 0
+    && tab.historyIndex < tab.history.length;
+}
+
 function compactDownloads(items: DownloadItem[]): SyncPayload["downloads"] {
   return items.map(({ content: _content, ...metadata }) => metadata);
 }
 
-function parseSyncPayload(raw: string): SyncPayload | null {
+function parseSyncPayload(raw: string, protectedUrls: ReadonlySet<string> = new Set()): SyncPayload | null {
   try {
     const parsed = JSON.parse(raw) as Partial<SyncPayload>;
     if (parsed.version !== 1 || !Array.isArray(parsed.bookmarks) || !Array.isArray(parsed.history) || !Array.isArray(parsed.tabs)) return null;
+    const parsedTabs = parsed.tabs.filter(isTabItem);
+    const privateUrls = new Set([...protectedUrls, ...privateTabHistoryUrls(parsedTabs)]);
+    const tabs = persistentTabs(parsedTabs);
+    const storedActiveTabId = typeof parsed.activeTabId === "string" ? parsed.activeTabId as TabId : null;
     return {
       version: 1,
       exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(),
-      bookmarks: parsed.bookmarks.filter(isBookmarkItem),
-      history: parsed.history.filter(isHistoryItem),
+      bookmarks: parsed.bookmarks.filter(isBookmarkItem).filter((bookmark) => !privateUrls.has(bookmark.url)),
+      history: historyWithoutPrivateUrls(parsed.history.filter(isHistoryItem), privateUrls),
       downloads: Array.isArray(parsed.downloads) ? parsed.downloads.filter((item): item is SyncPayload["downloads"][number] => Boolean(item && typeof item === "object" && typeof (item as DownloadItem).id === "string" && typeof (item as DownloadItem).name === "string")) : [],
-      tabs: parsed.tabs,
-      activeTabId: typeof parsed.activeTabId === "string" ? (parsed.activeTabId as TabId) : typeof parsed.tabs[0]?.id === "string" ? (parsed.tabs[0].id as TabId) : INITIAL_TAB_ID,
+      tabs,
+      activeTabId: storedActiveTabId && tabs.some((tab) => tab.id === storedActiveTabId)
+        ? storedActiveTabId
+        : tabs[0]?.id ?? INITIAL_TAB_ID,
       settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
     };
   } catch {
@@ -191,11 +236,13 @@ function parseSyncPayload(raw: string): SyncPayload | null {
   }
 }
 
-function usePersistedState<T>(key: string, fallback: T) {
-  const [value, setValue] = useState<T>(() => readStorage(key, fallback));
+function identity<T>(value: T): T { return value; }
+
+function usePersistedState<T>(key: string, fallback: T, normalize: (value: T) => T = identity) {
+  const [value, setValue] = useState<T>(() => normalize(readStorage(key, fallback)));
   useEffect(() => {
-    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* private browsing can reject storage */ }
-  }, [key, value]);
+    try { writePersistentValue(window.localStorage, key, value, normalize); } catch { /* storage can be unavailable */ }
+  }, [key, value, normalize]);
   return [value, setValue] as const;
 }
 
@@ -260,15 +307,25 @@ export default function Home() {
   // Constitutional core integration — the single live core instance.
   // The UI is a mirror: all navigation, tab lifecycle, and boundary changes
   // are routed through LyconCore (command/event → policy → engine contract).
-  const { state: coreState, core: lyconCore, dispatch, navigate, goBack, goForward, createTab, activateTab, closeTab: closeCoreTab, setShields, bindEngineSurface, reload, registerAgent, unregisterAgent, agentSuggestion } = useLyconCore();
+  const { state: coreState, navigate, goBack, goForward, createTab, createPrivateTab, activateTab, closeTab: closeCoreTab, setShields, bindEngineSurface, reload, registerAgent, unregisterAgent, agentSuggestion } = useLyconCore();
 
   const [settings, setSettings] = usePersistedState<SettingsState>("lycon-settings", defaultSettings);
   const [voskPack, setVoskPack] = usePersistedState<VoskPackState>("lycon-vosk-pack", { status: "not-installed", name: "English (US) · small", size: "40 MB" });
-  const [bookmarks, setBookmarks] = usePersistedState<BookmarkItem[]>("lycon-bookmarks", []);
-  const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory);
+  const legacyPrivateTabs = useMemo(() => storedTabs().filter((tab) => tab.isPrivate), []);
+  const legacyPrivateHistoryUrlsRef = useRef(privateTabHistoryUrls(legacyPrivateTabs));
+  const normalizeBookmarks = useCallback(
+    (items: BookmarkItem[]) => items.filter((bookmark) => !legacyPrivateHistoryUrlsRef.current.has(bookmark.url)),
+    [],
+  );
+  const [bookmarks, setBookmarks] = usePersistedState<BookmarkItem[]>("lycon-bookmarks", [], normalizeBookmarks);
+  const normalizeHistory = useCallback(
+    (entries: HistoryItem[]) => historyWithoutPrivateUrls(entries, legacyPrivateHistoryUrlsRef.current),
+    [],
+  );
+  const [tabs, setTabs] = usePersistedState<Tab[]>("lycon-tabs", initialTabs, persistentTabs);
+  const [historyEntries, setHistoryEntries] = usePersistedState<HistoryItem[]>("lycon-history", initialHistory, normalizeHistory);
   const [downloads, setDownloads] = usePersistedState<DownloadItem[]>("lycon-downloads", readDownloads());
-  const [tabs, setTabs] = usePersistedState<Tab[]>("lycon-tabs", initialTabs);
-  const [activeTabId, setActiveTabId] = usePersistedState<TabId>("lycon-active-tab", INITIAL_TAB_ID);
+  const [activeTabId, setActiveTabId] = useState<TabId>(persistentActiveTabId);
   const [currentView, setCurrentView] = useState<View>(() => viewFromPath(window.location.pathname));
   const [activePage, setActivePage] = useState<PageRecord>({ title: "Start", url: "lycon://start", kind: "local", view: "start" });
   const [address, setAddress] = useState("");
@@ -285,7 +342,11 @@ export default function Home() {
   const [syncStatus, setSyncStatus] = useState("Sync is off");
   const syncHydratedRef = useRef(false);
   const lastSyncedPayloadRef = useRef("");
-  const syncQuery = trpc.sync.get.useQuery(undefined, { enabled: isAuthenticated && settings.syncEnabled === true, retry: false });
+  const activeCoreTab = coreState.tabs.find((tab) => tab.id === coreState.activeTabId);
+  const activeIsPrivate = activeCoreTab?.isPrivate === true || tabs.find((tab) => tab.id === activeTabId)?.isPrivate === true;
+  const activeIsPrivateRef = useRef(activeIsPrivate);
+  activeIsPrivateRef.current = activeIsPrivate;
+  const syncQuery = trpc.sync.get.useQuery(undefined, { enabled: isAuthenticated && settings.syncEnabled === true && !activeIsPrivate, retry: false });
   const syncPut = trpc.sync.put.useMutation();
   const [draggingTabId, setDraggingTabId] = useState<TabId | null>(null);
   const [pressingTabId, setPressingTabId] = useState<TabId | null>(null);
@@ -313,6 +374,10 @@ export default function Home() {
   }, [settings.theme]);
 
   useEffect(() => {
+    if (activeIsPrivate) {
+      setSyncStatus("Sync paused in private session");
+      return;
+    }
     if (!settings.syncEnabled) {
       setSyncStatus("Sync is off");
       syncHydratedRef.current = false;
@@ -335,7 +400,8 @@ export default function Home() {
       if (syncQuery.data) setSyncRevision(syncQuery.data.revision);
       return;
     }
-    const remote = parseSyncPayload(syncQuery.data.payload);
+    const protectedUrls = new Set([...legacyPrivateHistoryUrlsRef.current, ...privateTabHistoryUrls(tabs)]);
+    const remote = parseSyncPayload(syncQuery.data.payload, protectedUrls);
     if (!remote) {
       syncHydratedRef.current = true;
       setSyncStatus("Remote snapshot could not be read; local data remains active");
@@ -350,24 +416,40 @@ export default function Home() {
     setSyncRevision(syncQuery.data.revision);
     syncHydratedRef.current = true;
     setSyncStatus("Merged with your account");
-  }, [settings.syncEnabled, isAuthenticated, syncQuery.data, syncQuery.error, syncQuery.isLoading]);
+  }, [activeIsPrivate, settings.syncEnabled, isAuthenticated, syncQuery.data, syncQuery.error, syncQuery.isLoading, tabs]);
 
   useEffect(() => {
-    if (!settings.syncEnabled || !isAuthenticated || !syncHydratedRef.current) return;
-    const payload: SyncPayload = { version: 1, exportedAt: new Date().toISOString(), bookmarks, history: historyEntries, downloads: compactDownloads(downloads), tabs, activeTabId, settings };
+    if (activeIsPrivate || !settings.syncEnabled || !isAuthenticated || !syncHydratedRef.current) return;
+    const persistentData = persistentSessionRecords(tabs, historyEntries, bookmarks, legacyPrivateHistoryUrlsRef.current);
+    const safeTabs = persistentData.tabs;
+    const payload: SyncPayload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      bookmarks: persistentData.bookmarks,
+      history: persistentData.history,
+      downloads: compactDownloads(downloads),
+      tabs: safeTabs,
+      activeTabId: safeTabs.some((tab) => tab.id === activeTabId) ? activeTabId : safeTabs[0]?.id ?? INITIAL_TAB_ID,
+      settings,
+    };
     const serialized = JSON.stringify(payload);
     if (serialized === lastSyncedPayloadRef.current) return;
     const timer = window.setTimeout(() => {
       setSyncStatus("Saving to your account…");
       syncPut.mutate({ baseRevision: syncRevision, payload: serialized }, {
         onSuccess: (result) => {
+          if (activeIsPrivateRef.current) {
+            setSyncStatus("Sync paused in private session");
+            return;
+          }
           if (result.ok) {
             setSyncRevision(result.revision);
             lastSyncedPayloadRef.current = serialized;
             setSyncStatus("Synced just now");
             return;
           }
-          const remote = parseSyncPayload(result.conflict.payload);
+          const protectedUrls = new Set([...legacyPrivateHistoryUrlsRef.current, ...privateTabHistoryUrls(tabs)]);
+          const remote = parseSyncPayload(result.conflict.payload, protectedUrls);
           if (remote) {
             setBookmarks((current) => mergeById(current, remote.bookmarks));
             setHistoryEntries((current) => mergeById(current, remote.history).slice(0, 50));
@@ -381,11 +463,13 @@ export default function Home() {
       });
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [settings.syncEnabled, isAuthenticated, bookmarks, historyEntries, downloads, tabs, activeTabId, settings, syncRevision]);
+  }, [activeIsPrivate, settings.syncEnabled, isAuthenticated, bookmarks, historyEntries, downloads, tabs, activeTabId, settings, syncRevision]);
 
   useEffect(() => {
-    try { window.localStorage.setItem("lycon-active-tab", JSON.stringify(activeTabId)); } catch { /* storage can be unavailable */ }
-  }, [activeTabId]);
+    if (tabs.some((tab) => tab.id === activeTabId && !tab.isPrivate)) {
+      try { window.localStorage.setItem("lycon-active-tab", JSON.stringify(activeTabId)); } catch { /* storage can be unavailable */ }
+    }
+  }, [activeTabId, tabs]);
 
   useEffect(() => {
     const restoredTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
@@ -409,15 +493,15 @@ export default function Home() {
         seen.add(coreTab.id);
         const existing = previous.find((tab) => tab.id === coreTab.id);
         if (existing) return existing;
-        const legacy = previous[index];
+        const legacy = persistentTabs(previous)[index];
         const startPage: PageRecord = { title: coreTab.isPrivate ? "Private" : "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
         return {
           id: coreTab.id,
           title: legacy?.title ?? startPage.title,
           favicon: legacy?.favicon,
-          isPrivate: coreTab.isPrivate || legacy?.isPrivate === true,
-          history: legacy?.history?.length ? legacy.history : [startPage],
-          historyIndex: legacy?.historyIndex ?? 0,
+          isPrivate: coreTab.isPrivate,
+          history: !coreTab.isPrivate && legacy?.history?.length ? legacy.history : [startPage],
+          historyIndex: !coreTab.isPrivate ? legacy?.historyIndex ?? 0 : 0,
         };
       });
       const orphansDropped = previous.some((tab) => !seen.has(tab.id));
@@ -473,7 +557,7 @@ export default function Home() {
   const showToast = (message: string) => setToast(message);
 
   const updateTab = (patch: Partial<Tab>) => {
-    setTabs((previous) => previous.map((tab) => tab.id === activeTabId ? { ...tab, ...patch } : tab));
+    setTabs((previous) => previous.map((tab) => tab.id === renderedActiveTabId ? { ...tab, ...patch } : tab));
   };
 
   const navigateTo = async (destination: PageRecord) => {
@@ -506,8 +590,10 @@ export default function Home() {
 
     const nextHistory = [...(activeTab?.history ?? []), destination];
     updateTab({ title: destination.title, favicon: destination.favicon, history: nextHistory, historyIndex: nextHistory.length - 1 });
-    const nextHistoryEntry: HistoryItem = { ...destination, id: `history-${Date.now()}`, visited: "Just now", visitedAt: Date.now() };
-    setHistoryEntries((previous) => [nextHistoryEntry, ...previous.filter((item) => item.url !== destination.url)].slice(0, 50));
+    if (!activeTab?.isPrivate) {
+      const nextHistoryEntry: HistoryItem = { ...destination, id: `history-${Date.now()}`, visited: "Just now", visitedAt: Date.now() };
+      setHistoryEntries((previous) => [nextHistoryEntry, ...previous.filter((item) => item.url !== destination.url)].slice(0, 50));
+    }
   };
 
   const openOnlinePage = async () => {
@@ -518,7 +604,10 @@ export default function Home() {
     // the core so Net capabilities (CanNetwork/CanEmbedContent) are granted
     // and the RealEngineAdapter renders the page in the engine surface.
     const opened = await setShields(tabId, false, url);
-    if (!opened.some((event) => event.type === "ThresholdOpened")) return;
+    if (!opened.some((event) => event.type === "ThresholdOpened")) {
+      if (activeTab?.isPrivate) showToast("Private online browsing is unavailable because this engine cannot isolate site storage");
+      return;
+    }
     const navigated = await navigate(tabId, url);
     if (navigated.some((event) => event.type === "NavigationCompleted")) setOnlineOpened(true);
   };
@@ -580,25 +669,64 @@ export default function Home() {
     }
   };
 
-  const mirrorNewTab = (id: TabId, title: string) => {
+  const mirrorNewTab = (id: TabId, title: string, isPrivate = false) => {
+    const startPage: PageRecord = { title: "Start", url: "lycon://start", kind: "local", view: "start", favicon: "/assets/lycon-logo.png" };
+    setTabs((previous) => previous.some((tab) => tab.id === id) ? previous : [...previous, {
+      id,
+      title,
+      isPrivate,
+      history: [startPage],
+      historyIndex: 0,
+    }]);
+    setActiveTabId(id);
     setCurrentView("start");
     window.history.pushState({}, "", "/");
-    setActivePage({ title, url: "lycon://start", kind: "local", view: "start" });
+    setActivePage({ ...startPage, title });
     setAddress("");
+    setOnlineOpened(false);
   };
 
   const newPrivateTab = async () => {
-    if (!coreState.isReady || !coreState.windowId) return;
-    const events = await createTab(coreState.windowId, true);
-    const created = events.find((event): event is Extract<CoreEvent, { type: "TabCreated" }> => event.type === "TabCreated");
-    if (!created) return;
-    const activated = await activateTab(created.tabId);
-    if (!activated.some((event) => event.type === "TabActivated")) return;
-    mirrorNewTab(created.tabId, "Private");
-    showToast("Private tab opened");
+    if (!coreState.isReady) return;
+    if (recordingActive) {
+      showToast("Stop screen recording before opening a private session");
+      return;
+    }
+    let createdTabId: TabId | null = null;
+    try {
+      const events = await createPrivateTab();
+      const created = events.find((event): event is Extract<CoreEvent, { type: "TabCreated" }> => event.type === "TabCreated");
+      if (!created) {
+        showToast("Private session could not be created");
+        return;
+      }
+      createdTabId = created.tabId;
+      const activated = await activateTab(created.tabId);
+      if (!activated.some((event) => event.type === "TabActivated")) {
+        await closeCoreTab(created.tabId);
+        showToast("Private session could not be activated");
+        return;
+      }
+      mirrorNewTab(created.tabId, "Start", true);
+      showToast("Private session opened");
+    } catch (error) {
+      if (createdTabId) {
+        try {
+          await closeCoreTab(createdTabId);
+        } catch (cleanupError) {
+          console.error("Private tab cleanup failed:", cleanupError);
+        }
+      }
+      console.error("Private session creation failed:", error);
+      showToast("Private session could not be created");
+    }
   };
 
   const newTab = async () => {
+    if (activeTab?.isPrivate) {
+      await newPrivateTab();
+      return;
+    }
     if (!coreState.isReady || !coreState.windowId) return;
     const events = await createTab(coreState.windowId, false);
     const created = events.find((event): event is Extract<CoreEvent, { type: "TabCreated" }> => event.type === "TabCreated");
@@ -609,6 +737,11 @@ export default function Home() {
   };
 
   const closeLocalTab = async (id: TabId) => {
+    const closingPrivateTab = tabs.find((tab) => tab.id === id)?.isPrivate === true;
+    if (tabs.find((tab) => tab.id === id && !tab.isPrivate) && tabs.filter((tab) => !tab.isPrivate).length === 1) {
+      showToast("Lycon keeps one persistent tab open");
+      return;
+    }
     if (coreState.isReady && coreState.tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
     if (!coreState.isReady && tabs.length === 1) { showToast("Lycon keeps one tab open"); return; }
 
@@ -617,12 +750,35 @@ export default function Home() {
       if (!events.some((event) => event.type === "TabClosed")) return;
     }
 
-    setTabs((previous) => previous.filter((tab) => tab.id !== id));
+    const remaining = tabs.filter((tab) => tab.id !== id);
+    setTabs(remaining);
+    if (renderedActiveTabId === id) {
+      const nextTab = remaining.find((tab) => !tab.isPrivate) ?? remaining[0];
+      if (nextTab) {
+        if (!closingPrivateTab) {
+          const activated = await activateTab(nextTab.id);
+          if (!activated.some((event) => event.type === "TabActivated")) return;
+        }
+        setActiveTabId(nextTab.id);
+        const page = nextTab.history[nextTab.historyIndex] ?? nextTab.history[0];
+        if (page) {
+          setCurrentView(page.view ?? "online");
+          setActivePage(page);
+          setAddress(addressForPage(page));
+          setOnlineOpened(page.kind === "online");
+        }
+      }
+    }
   };
 
   const togglePrivate = () => {
-    updateTab({ isPrivate: !activeTab?.isPrivate });
-    showToast(activeTab?.isPrivate ? "Private mode off" : "Private mode on");
+    if (activeTab?.isPrivate) {
+      const persistentTab = [...tabs].reverse().find((tab) => !tab.isPrivate);
+      if (persistentTab) void selectTab(persistentTab);
+      else void newTab();
+      return;
+    }
+    void newPrivateTab();
   };
 
   const toggleDesktopSite = () => {
@@ -632,6 +788,10 @@ export default function Home() {
 
   const downloadCurrentPage = async () => {
     setOverflowOpen(false);
+    if (activeTab?.isPrivate) {
+      showToast("Downloads are unavailable in a private session");
+      return;
+    }
     const stem = safeFileStem(activePage.title || activePage.url);
     if (activePage.kind === "online") {
       try {
@@ -655,6 +815,10 @@ export default function Home() {
 
   const shareCurrentPage = async (toAI = false) => {
     setOverflowOpen(false);
+    if (activeTab?.isPrivate) {
+      showToast("Sharing is unavailable in a private session");
+      return;
+    }
     const url = activePage.kind === "online" ? activePage.url : window.location.href;
     const visibleText = activePage.kind === "online" ? "" : (document.querySelector(".primary-content")?.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 1800);
     const text = toAI
@@ -681,6 +845,10 @@ export default function Home() {
 
   const toggleScreenRecording = async () => {
     setOverflowOpen(false);
+    if (activeTab?.isPrivate) {
+      showToast("Screen recording is unavailable in a private session");
+      return;
+    }
     if (recordingActive) {
       mediaRecorderRef.current?.stop();
       return;
@@ -691,6 +859,11 @@ export default function Home() {
     }
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
+      if (activeIsPrivateRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        showToast("Screen recording is unavailable in a private session");
+        return;
+      }
       const mimeType = ["video/webm;codecs=vp9,opus", "video/webm"].find((candidate) => MediaRecorder.isTypeSupported(candidate));
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       recordingChunksRef.current = [];
@@ -716,6 +889,7 @@ export default function Home() {
   };
 
   const toggleBookmark = () => {
+    if (activeTab?.isPrivate) { showToast("Bookmarks are unavailable in a private session"); return; }
     if (activePage.kind === "local") { showToast("Local views are already in your field kit"); return; }
     if (isBookmarked) {
       setBookmarks((previous) => previous.filter((bookmark) => bookmark.url !== activePage.url));
@@ -727,6 +901,11 @@ export default function Home() {
   };
 
   const handleFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (activeTab?.isPrivate) {
+      event.target.value = "";
+      showToast("Files cannot be added to persistent downloads in a private session");
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -767,18 +946,33 @@ export default function Home() {
   const clearBrowsingData = () => { setHistoryEntries([]); setDownloads([]); showToast("History and downloads cleared"); setOverflowOpen(false); };
   const changeZoom = (delta: number) => setZoomLevel((value) => Math.min(150, Math.max(70, value + delta)));
   const resetZoom = () => setZoomLevel(100);
-  const printCurrentPage = () => { window.print(); setOverflowOpen(false); };
+  const printCurrentPage = () => {
+    setOverflowOpen(false);
+    if (activeTab?.isPrivate) { showToast("Printing is unavailable in a private session"); return; }
+    window.print();
+  };
   const findOnPage = () => { setOverflowOpen(false); addressInputRef.current?.focus(); addressInputRef.current?.select(); showToast("Type a term in the toolbar to search the local page index"); };
   const showUnsupported = (label: string) => { setOverflowOpen(false); showToast(`${label} is not available in this local web shell yet`); };
-  const openNewWindow = () => { const opened = window.open(window.location.href, "_blank", "noopener,noreferrer"); if (!opened) showToast("Your browser blocked the new Lycon window"); else showToast("New Lycon window opened"); setOverflowOpen(false); };
+  const openNewWindow = () => {
+    setOverflowOpen(false);
+    if (activeTab?.isPrivate) { showToast("Open a new window from a persistent session"); return; }
+    const opened = window.open(window.location.href, "_blank", "noopener,noreferrer");
+    if (!opened) showToast("Your browser blocked the new Lycon window");
+    else showToast("New Lycon window opened");
+  };
   const captureLocalScreenshot = async () => {
     setOverflowOpen(false);
+    if (activeTab?.isPrivate) { showToast("Screenshots are unavailable in a private session"); return; }
     setScreenshotBusy(true);
     showToast("Capturing local page snapshot…");
     try {
       const target = document.querySelector(".lycon-main") as HTMLElement | null;
       if (!target) throw new Error("Page surface unavailable");
       const canvas = await html2canvas(target, { backgroundColor: null, useCORS: true, allowTaint: false, logging: false, scale: Math.min(2, window.devicePixelRatio || 1) });
+      if (activeIsPrivateRef.current) {
+        showToast("Screenshots are unavailable in a private session");
+        return;
+      }
       const link = document.createElement("a");
       link.download = `lycon-snapshot-${new Date().toISOString().replace(/[:.]/g, "-")}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -824,6 +1018,10 @@ export default function Home() {
   }, [activeTabId, tabs.length]);
 
   const selectTab = async (tab: Tab) => {
+    if (tab.isPrivate && recordingActive) {
+      showToast("Stop screen recording before entering a private session");
+      return;
+    }
     const page = tab.history[tab.historyIndex] ?? tab.history[0];
     if (coreState.isReady && coreState.activeTabId) {
       if (coreState.activeTabId !== tab.id) {
@@ -832,6 +1030,7 @@ export default function Home() {
       }
     }
     if (!page) return;
+    setActiveTabId(tab.id);
     setCurrentView(page.view ?? "online");
     setActivePage(page);
     setAddress(addressForPage(page));
@@ -840,8 +1039,45 @@ export default function Home() {
 
   const requestClearBrowsingData = () => setConfirmAction({ title: "Clear browsing data?", copy: "This removes local history and downloaded document records from Lycon. Saved pages and settings stay untouched.", confirmLabel: "Clear local data", onConfirm: clearBrowsingData });
   const requestRemoveBookmark = (id: string) => { const item = bookmarks.find((bookmark) => bookmark.id === id); if (!item) return; setConfirmAction({ title: "Delete saved page?", copy: `Remove “${item.title}” from your local saved pages? This cannot be undone from Lycon.`, confirmLabel: "Delete saved page", onConfirm: () => { setBookmarks((previous) => previous.filter((bookmark) => bookmark.id !== id)); showToast("Saved page deleted"); } }); };
-  const exportLocalData = () => { const payload: BackupPayload = { format: "lycon-local-backup", version: 1, exportedAt: new Date().toISOString(), bookmarks, history: historyEntries, downloads }; const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = `lycon-local-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(url); showToast("Local backup exported"); };
-  const importLocalData = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; event.target.value = ""; if (!file) return; try { const parsed = JSON.parse(await file.text()) as Partial<BackupPayload>; if (parsed.format !== "lycon-local-backup" || parsed.version !== 1) throw new Error("Unsupported backup"); const importedBookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks.filter(isBookmarkItem) : []; const importedHistory = Array.isArray(parsed.history) ? parsed.history.filter(isHistoryItem) : []; const importedDownloads = Array.isArray(parsed.downloads) ? parsed.downloads.filter(isDownloadItem) : []; setBookmarks((previous) => mergeById(previous, importedBookmarks)); setHistoryEntries((previous) => mergeById(previous, importedHistory).slice(0, 50)); setDownloads((previous) => mergeById(previous, importedDownloads).slice(0, 100)); showToast(`Imported ${importedBookmarks.length} saved pages and ${importedDownloads.length} documents`); } catch { showToast("That file is not a Lycon local backup"); } };
+  const exportLocalData = () => {
+    const persistentData = persistentSessionRecords(tabs, historyEntries, bookmarks, legacyPrivateHistoryUrlsRef.current);
+    const payload: BackupPayload = {
+      format: "lycon-local-backup",
+      version: 2,
+      privacyScope: "persistent-only",
+      exportedAt: new Date().toISOString(),
+      bookmarks: persistentData.bookmarks,
+      history: persistentData.history,
+      downloads,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `lycon-local-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Local backup exported");
+  };
+  const importLocalData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as Partial<BackupPayload>;
+      if (parsed.format !== "lycon-local-backup" || parsed.version !== 2 || parsed.privacyScope !== "persistent-only") throw new Error("Unsupported or unscoped backup");
+      const privateUrls = new Set([...legacyPrivateHistoryUrlsRef.current, ...privateTabHistoryUrls(tabs)]);
+      const importedBookmarks = Array.isArray(parsed.bookmarks) ? parsed.bookmarks.filter(isBookmarkItem).filter((item) => !privateUrls.has(item.url)) : [];
+      const importedHistory = Array.isArray(parsed.history) ? historyWithoutPrivateUrls(parsed.history.filter(isHistoryItem), privateUrls) : [];
+      const importedDownloads = Array.isArray(parsed.downloads) ? parsed.downloads.filter(isDownloadItem) : [];
+      setBookmarks((previous) => mergeById(previous, importedBookmarks));
+      setHistoryEntries((previous) => mergeById(previous, importedHistory).slice(0, 50));
+      setDownloads((previous) => mergeById(previous, importedDownloads).slice(0, 100));
+      showToast(`Imported ${importedBookmarks.length} saved pages and ${importedDownloads.length} documents`);
+    } catch {
+      showToast("That file is not a supported Lycon local backup");
+    }
+  };
 
   return (
     <div className={`lycon-app display-${settings.displayMode ?? "auto"}`} style={{ "--lycon-zoom": `${zoomLevel / 100}` } as CSSProperties}>
@@ -862,7 +1098,7 @@ export default function Home() {
             {activeTab?.isPrivate ? <EyeOff size={15} className="private-ink" /> : <LockKeyhole size={14} className={activePage.kind === "local" ? "local-ink" : "online-ink"} />}
             <input ref={addressInputRef} className="address-input" value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search locally or enter an address" aria-label="Address and search" />
             {address ? <button type="button" className="clear-btn" onClick={() => setAddress("")} aria-label="Clear address"><X size={13} /></button> : <Search size={14} className="muted-ink" />}
-            <VoiceInputButton onTranscript={setAddress} onStatus={showToast} processLocally={voiceMode !== "online"} voskReady={voskPack.status === "ready"} language={settings.voiceLanguage ?? "en-ZA"} />
+            <VoiceInputButton onTranscript={setAddress} onStatus={showToast} processLocally={voiceMode !== "online"} privateSession={activeTab?.isPrivate === true} voskReady={voskPack.status === "ready"} language={settings.voiceLanguage ?? "en-ZA"} />
           </form>
           <div className={`console-signal signal-${shellState}`}><span className="console-signal-dot" /><span>{shellState === "private" ? "PRIVATE" : shellState === "online" ? "HANDOFF" : "LOCAL"}</span></div><SyncStatusIndicator enabled={settings.syncEnabled === true} status={syncStatus} />
           <button className={`icon-btn ${settings.desktopSite ? "active state-on" : ""}`} onClick={toggleDesktopSite} aria-label={settings.desktopSite ? "Turn off Desktop site" : "Turn on Desktop site"} aria-pressed={settings.desktopSite} title={settings.desktopSite ? "Desktop site on" : "Desktop site off"}><Monitor size={17} /></button><button className={`icon-btn ${isBookmarked ? "active" : ""}`} onClick={toggleBookmark} disabled={!activeTab || activePage.view === "start"} aria-label={isBookmarked ? "Remove bookmark" : "Save bookmark"}><Bookmark size={17} fill={isBookmarked ? "currentColor" : "none"} /></button>
@@ -912,11 +1148,12 @@ function VoiceTestPhrase({ language, processLocally }: { language: string; proce
   return <div className="voice-test"><div><strong>Test microphone and language</strong><p>Say “Lycon voice check” to verify {language} before using the toolbar microphone.</p></div><button className="secondary-btn" type="button" onClick={test}><Mic size={14} /> Run test</button><span className="voice-test-status" aria-live="polite">{status}</span></div>;
 }
 
-function VoiceInputButton({ onTranscript, onStatus, processLocally, voskReady, language }: { onTranscript: (value: string) => void; onStatus: (message: string) => void; processLocally: boolean; voskReady: boolean; language: string }) {
+function VoiceInputButton({ onTranscript, onStatus, processLocally, privateSession, voskReady, language }: { onTranscript: (value: string) => void; onStatus: (message: string) => void; processLocally: boolean; privateSession: boolean; voskReady: boolean; language: string }) {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
   useEffect(() => () => { recognitionRef.current?.stop?.(); }, []);
   const startListening = async () => {
+    if (privateSession) { onStatus("Voice input is unavailable in a private session"); return; }
     const speechWindow = window as typeof window & { SpeechRecognition?: any; webkitSpeechRecognition?: any };
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) { onStatus("Voice input is not supported in this browser"); return; }

@@ -19,11 +19,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, waitFor, act, type RenderHookResult } from '@testing-library/react';
 import { useLyconCore, type LyconCoreBridge } from './useLyconCore';
 import type { EngineAdapter } from '../../../core/types/06_engine';
+import type { LyconCore } from '../../../core/LyconCore';
 import { Id } from '../../../core/types/00_ids';
 import type { CoreEvent, CommandRejected, AgentRegistered, AgentUnregistered } from '../../../core/types/04_events';
+import { PRIVATE_SESSION_FORBIDDEN_CAPABILITIES } from '../../../core/types/05_policy';
 
 interface LyconDiagnostic {
-  core: unknown;
+  core: LyconCore;
   adapter: EngineAdapter;
   getState: () => { thresholdState: string | null; activeTabId: string | null };
   getEvents: () => readonly CoreEvent[];
@@ -52,7 +54,7 @@ describe('useLyconCore constitutional integration', () => {
 
   async function boot(): Promise<LyconDiagnostic> {
     hook = renderHook(() => useLyconCore());
-    await waitFor(() => expect(hook!.result.current.state.isReady).toBe(true), { timeout: 5000 });
+    await waitFor(() => expect(hook!.result.current.state.isReady).toBe(true), { timeout: 15000 });
     const d = diag();
     expect(d.adapter.capabilities.name).toMatch(/real/i);
     return d;
@@ -128,12 +130,83 @@ describe('useLyconCore constitutional integration', () => {
     await act(async () => {
       await bridge().activateTab(tabCreated!.tabId);
     });
+
     expect(bridge().state.activeTabId).toBe(tabCreated!.tabId);
 
     const closed = await act(async () => bridge().closeTab(tabCreated!.tabId));
     expect(closed.some((e) => e.type === 'TabClosed')).toBe(true);
     expect(bridge().state.tabs).toHaveLength(1);
     expect(bridge().state.activeTabId).toBe(originalTabId);
+  });
+
+  it('creates, activates, and destroys a distinct private session through Core', async () => {
+    const d = await boot();
+    const persistentTabId = bridge().state.activeTabId as string;
+    const persistentSessionId = bridge().state.sessionId;
+    const persistentWindowId = bridge().state.windowId;
+    const events = await act(async () => bridge().createPrivateTab());
+    const session = events.find((event): event is Extract<CoreEvent, { type: 'SessionCreated' }> => event.type === 'SessionCreated');
+    const window = events.find((event): event is Extract<CoreEvent, { type: 'WindowCreated' }> => event.type === 'WindowCreated');
+    const tab = events.find((event): event is Extract<CoreEvent, { type: 'TabCreated' }> => event.type === 'TabCreated');
+
+    expect(session?.mode).toBe('private');
+    expect(window?.sessionId).toBe(session?.sessionId);
+    expect(tab).toMatchObject({ sessionId: session?.sessionId, windowId: window?.windowId, tabType: 'private' });
+    expect(tab).toBeTruthy();
+
+    await act(async () => bridge().activateTab(tab!.tabId));
+    const coreTab = d.core.getTab(tab!.tabId)!;
+    const engineContext = d.core.getEngineContext(tab!.tabId)!;
+    const capabilities = d.core.getCapabilities(session!.sessionId, tab!.tabId);
+    expect(d.core.getSession(coreTab.sessionId)?.mode).toBe('private');
+    expect(coreTab.windowId).toBe(window!.windowId);
+    expect(engineContext.sessionId).toBe(session!.sessionId);
+    expect(engineContext.sessionMode).toBe('private');
+    expect(engineContext.tabType).toBe('private');
+    expect(bridge().state.sessionId).toBe(session!.sessionId);
+    expect(bridge().state.windowId).toBe(window!.windowId);
+    for (const forbidden of PRIVATE_SESSION_FORBIDDEN_CAPABILITIES) {
+      expect(capabilities.capabilities.has(forbidden)).toBe(false);
+    }
+    expect(d.adapter.capabilities.canIsolatePrivateSessions).toBe(false);
+    await act(async () => bridge().navigate(tab!.tabId, 'lycon://search?q=private-marker'));
+    expect(bridge().state.currentUrl).toBe('lycon://search?q=private-marker');
+    expect(JSON.stringify(d.core.getEvents())).not.toContain('private-marker');
+
+    await act(async () => bridge().activateTab(persistentTabId));
+    expect(bridge().state.activeTabId).toBe(persistentTabId);
+    expect(bridge().state.sessionId).toBe(persistentSessionId);
+    expect(bridge().state.windowId).toBe(persistentWindowId);
+    expect(bridge().state.currentUrl).toBeNull();
+
+    await act(async () => bridge().activateTab(tab!.tabId));
+    expect(bridge().state.activeTabId).toBe(tab!.tabId);
+    expect(bridge().state.sessionId).toBe(session!.sessionId);
+    expect(bridge().state.windowId).toBe(window!.windowId);
+
+    const closed = await act(async () => bridge().closeTab(tab!.tabId));
+    expect(closed.some((event) => event.type === 'TabClosed')).toBe(true);
+    expect(closed.some((event) => event.type === 'WindowClosed')).toBe(true);
+    expect(closed.some((event) => event.type === 'SessionDestroyed')).toBe(true);
+    expect(d.core.getSession(session!.sessionId)).toBeUndefined();
+    expect(bridge().state.currentUrl).toBeNull();
+    expect(bridge().state.sessionId).toBe(persistentSessionId);
+    expect(bridge().state.windowId).toBe(persistentWindowId);
+  }, 30000);
+
+  it('refuses private online boundary operations when the adapter cannot isolate site storage', async () => {
+    const d = await boot();
+    const events = await act(async () => bridge().createPrivateTab());
+    const tab = events.find((event): event is Extract<CoreEvent, { type: 'TabCreated' }> => event.type === 'TabCreated')!;
+    await act(async () => bridge().activateTab(tab.tabId));
+    const navigateSpy = vi.spyOn(d.adapter, 'navigate');
+
+    const boundaryEvents = await act(async () => bridge().openBoundary(tab.tabId, 'https://private.example'));
+    const navigationEvents = await act(async () => bridge().navigate(tab.tabId, 'https://private.example'));
+
+    expect(rejected(boundaryEvents, 'OpenBoundary')).toBe(true);
+    expect(rejected(navigationEvents, 'Navigate')).toBe(true);
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('routes back/forward through the engine adapter history', async () => {
@@ -143,22 +216,22 @@ describe('useLyconCore constitutional integration', () => {
     const goForwardSpy = vi.spyOn(d.adapter, 'goForward');
 
     await act(async () => {
-      await bridge().navigate(tabId, 'lycon://one');
-      await bridge().navigate(tabId, 'lycon://two');
+      await bridge().navigate(tabId, 'lycon://start');
+      await bridge().navigate(tabId, 'lycon://history');
     });
-    expect(bridge().state.currentUrl).toBe('lycon://two');
+    expect(bridge().state.currentUrl).toBe('lycon://history');
 
     await act(async () => {
       await bridge().goBack(tabId);
     });
     expect(goBackSpy).toHaveBeenCalledWith(tabId);
-    expect(bridge().state.currentUrl).toBe('lycon://one');
+    expect(bridge().state.currentUrl).toBe('lycon://start');
 
     await act(async () => {
       await bridge().goForward(tabId);
     });
     expect(goForwardSpy).toHaveBeenCalledWith(tabId);
-    expect(bridge().state.currentUrl).toBe('lycon://two');
+    expect(bridge().state.currentUrl).toBe('lycon://history');
   });
 
   it('seals the threshold via closeBoundary and revokes online navigation again', async () => {

@@ -154,12 +154,34 @@ describe('Shield S3: Private by Construction', () => {
       sessionId: Id.session(),
       tabId: null,
     });
+
     for (const cap of PRIVATE_SESSION_FORBIDDEN_CAPABILITIES) {
       expect(
         result.capabilities.has(cap),
         `Private session should NOT have ${cap}`
       ).toBe(false);
     }
+  });
+
+  it('fails safe when a private tab is resolved against a persistent session', () => {
+    const result = CapabilityResolver.resolve({
+      identity: LYCON_IDENTITY_V1,
+      sessionMode: 'persistent',
+      thresholdState: 'open',
+      tabType: 'private',
+      browserState: 'running',
+      sessionId: Id.session(),
+      tabId: Id.tab(),
+    });
+
+    for (const capability of PRIVATE_SESSION_FORBIDDEN_CAPABILITIES) {
+      expect(result.capabilities.has(capability), `mismatched context must lack ${capability}`).toBe(false);
+      expect(result.revoked).toContainEqual({
+        capability,
+        reason: 'inconsistent-tab-session-mode',
+      });
+    }
+    expect(result.capabilities.has('CanNetwork')).toBe(true);
   });
 
   it('NO runtime if(!private) checks needed — capabilities are structurally absent (S3)', () => {

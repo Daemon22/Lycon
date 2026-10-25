@@ -9,7 +9,16 @@ export const tabSchema = z.object({
   active: z.boolean().optional(),
 });
 
-export const syncPayloadSchema = z.string().min(2).max(60000);
+export const syncPayloadSchema = z.string().min(2).max(60000).refine((payload) => {
+  try {
+    const parsed = JSON.parse(payload) as { tabs?: unknown };
+    return !Array.isArray(parsed.tabs) || !parsed.tabs.some((tab) =>
+      Boolean(tab && typeof tab === "object" && (tab as { isPrivate?: unknown }).isPrivate === true)
+    );
+  } catch {
+    return true;
+  }
+}, { message: "Private session tabs cannot be synchronized." });
 
 export const syncPutInputSchema = z.object({
   baseRevision: z.number().int().min(0),
