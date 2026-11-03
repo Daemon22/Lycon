@@ -24,25 +24,32 @@ function isSecureRequest(req: Request) {
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
+  const isProduction = process.env.NODE_ENV === "production";
+  const isSecure = isSecureRequest(req) || isProduction;
 
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
+  // For development, allow localhost without strict security
+  // For production, enforce strict security
+  return {
+    httpOnly: true, // Prevents JavaScript access (XSS protection)
+    path: "/",
+    sameSite: isSecure ? "strict" : "lax", // CSRF protection
+    secure: isSecure, // Only sent over HTTPS
+    // domain: Optional - set if you need cross-subdomain cookies
+  };
+}
+
+/**
+ * Get secure cookie options for sensitive operations (like OAuth state)
+ */
+export function getSecureCookieOptions(
+  req: Request
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+  const isSecure = isSecureRequest(req) || process.env.NODE_ENV === "production";
 
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: "strict",
+    secure: isSecure,
   };
 }
