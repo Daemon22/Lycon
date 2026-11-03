@@ -29,6 +29,8 @@ export interface CoreTabMirror {
   id: TabId;
   title: string;
   isPrivate: boolean;
+  sessionId: SessionId;
+  windowId: WindowId;
 }
 
 export interface CoreState {
@@ -55,6 +57,7 @@ export interface LyconCoreBridge {
   goBack: (tabId: TabId) => Promise<CoreEvent[]>;
   goForward: (tabId: TabId) => Promise<CoreEvent[]>;
   createTab: (windowId: WindowId, isPrivate?: boolean) => Promise<CoreEvent[]>;
+  createPrivateTab: () => Promise<CoreEvent[]>;
   activateTab: (tabId: TabId) => Promise<CoreEvent[]>;
   closeTab: (tabId: TabId) => Promise<CoreEvent[]>;
   openBoundary: (tabId: TabId, url: string) => Promise<CoreEvent[]>;
@@ -113,22 +116,42 @@ export function useLyconCore(): LyconCoreBridge {
         case 'TabCreated':
           next = {
             ...prev,
-            tabs: [...prev.tabs, { id: event.tabId, title: 'New Tab', isPrivate: event.tabType === 'private' }],
+            tabs: [...prev.tabs, {
+              id: event.tabId,
+              title: 'New Tab',
+              isPrivate: event.tabType === 'private',
+              sessionId: event.sessionId,
+              windowId: event.windowId,
+            }],
           };
           break;
-        case 'TabActivated':
-          next = { ...prev, activeTabId: event.tabId };
+        case 'TabActivated': {
+          const activeTab = prev.tabs.find((tab) => tab.id === event.tabId);
+          next = {
+            ...prev,
+            activeTabId: event.tabId,
+            sessionId: activeTab?.sessionId ?? prev.sessionId,
+            windowId: activeTab?.windowId ?? prev.windowId,
+            currentUrl: prev.activeTabId === event.tabId ? prev.currentUrl : null,
+            thresholdState: coreRef.current?.getThreshold(event.tabId)?.state ?? prev.thresholdState,
+          };
           break;
-        case 'TabClosed':
+        }
+        case 'TabClosed': {
+          const wasActiveTabClosed = prev.activeTabId === event.tabId;
+          const nextActiveTab = wasActiveTabClosed
+            ? prev.tabs.find((tab) => tab.id !== event.tabId)
+            : null;
           next = {
             ...prev,
             tabs: prev.tabs.filter((t) => t.id !== event.tabId),
-            activeTabId:
-              prev.activeTabId === event.tabId
-                ? (prev.tabs.find((t) => t.id !== event.tabId)?.id ?? null)
-                : prev.activeTabId,
+            activeTabId: wasActiveTabClosed ? nextActiveTab?.id ?? null : prev.activeTabId,
+            currentUrl: wasActiveTabClosed ? null : prev.currentUrl,
+            sessionId: nextActiveTab?.sessionId ?? (wasActiveTabClosed ? null : prev.sessionId),
+            windowId: nextActiveTab?.windowId ?? (wasActiveTabClosed ? null : prev.windowId),
           };
           break;
+        }
         case 'NavigationCompleted':
           next = { ...prev, currentUrl: event.finalUrl };
           break;
@@ -232,7 +255,13 @@ export function useLyconCore(): LyconCoreBridge {
           sessionId: sessionCreated.sessionId,
           windowId: windowCreated.windowId,
           activeTabId: tabCreated.tabId,
-          tabs: [{ id: tabCreated.tabId, title: 'Start', isPrivate: false }],
+          tabs: [{
+            id: tabCreated.tabId,
+            title: 'Start',
+            isPrivate: false,
+            sessionId: sessionCreated.sessionId,
+            windowId: windowCreated.windowId,
+          }],
           currentUrl: 'about:start',
           thresholdState: 'sealed',
         });
@@ -327,6 +356,40 @@ export function useLyconCore(): LyconCoreBridge {
       windowId,
       typeKind: isPrivate ? 'private' : 'normal',
     });
+  }, [dispatchCommand]);
+
+  const createPrivateTab = useCallback(async (): Promise<CoreEvent[]> => {
+    const sessionEvents = await dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'CreateSession',
+      mode: 'private',
+    });
+    const session = sessionEvents.find((event): event is Extract<CoreEvent, { type: 'SessionCreated' }> => event.type === 'SessionCreated');
+    if (!session) return sessionEvents;
+
+    const windowEvents = await dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'CreateWindow',
+      sessionId: session.sessionId,
+      width: typeof window !== 'undefined' ? window.innerWidth : 1280,
+      height: typeof window !== 'undefined' ? window.innerHeight : 800,
+    });
+    const privateWindow = windowEvents.find((event): event is Extract<CoreEvent, { type: 'WindowCreated' }> => event.type === 'WindowCreated');
+    if (!privateWindow) return [...sessionEvents, ...windowEvents];
+
+    const tabEvents = await dispatchCommand({
+      commandId: Id.command(),
+      participantId: PARTICIPANT_ID,
+      timestamp: Date.now(),
+      type: 'CreateTab',
+      windowId: privateWindow.windowId,
+      typeKind: 'private',
+    });
+    return [...sessionEvents, ...windowEvents, ...tabEvents];
   }, [dispatchCommand]);
 
   const activateTab = useCallback((tabId: TabId) => {
@@ -437,6 +500,7 @@ export function useLyconCore(): LyconCoreBridge {
     goBack,
     goForward,
     createTab,
+    createPrivateTab,
     activateTab,
     closeTab,
     openBoundary,

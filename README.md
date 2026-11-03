@@ -11,8 +11,6 @@ no separate per-platform UI, and no version drift.
 
 See [SINGLE_SOURCE.md](SINGLE_SOURCE.md) for the single-source-of-truth policy.
 
-> ⚠️ This is currently a private repository.
-
 ![Lycon Browser](client/public/assets/lycon-logo.png)
 
 ## Architecture

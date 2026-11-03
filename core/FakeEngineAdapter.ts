@@ -40,6 +40,7 @@ export class FakeEngineAdapter implements EngineAdapter {
     canAccessFile: true,
     canRunJavaScript: true,
     canManageCookies: true,
+    canIsolatePrivateSessions: true,
     canGeolocation: true,
     canMedia: true,
     canFullscreen: true,
@@ -79,6 +80,10 @@ export class FakeEngineAdapter implements EngineAdapter {
     this.attachedTabs.delete(tabId as string);
     this.history.delete(tabId);
     this.zoom.delete(tabId);
+    return Promise.resolve();
+  }
+
+  sealBoundary(_tabId: TabId): Promise<void> {
     return Promise.resolve();
   }
 

@@ -8,6 +8,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { securityHeaders, csrfProtection, sanitizeInput, securityErrorHandler } from "./security";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -31,14 +32,22 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // Security middleware
+  app.use(securityHeaders);
+  app.use(csrfProtection);
+  app.use(sanitizeInput);
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.get("/_app/health", (_req, res) => {
     res.status(200).json({ ok: true });
   });
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -47,6 +56,10 @@ async function startServer() {
       createContext,
     })
   );
+
+  // Error handler (must be last)
+  app.use(securityErrorHandler);
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

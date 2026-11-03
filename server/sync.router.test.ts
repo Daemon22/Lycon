@@ -46,6 +46,17 @@ describe("sync router", () => {
     expect(saveSnapshot).not.toHaveBeenCalled();
   });
 
+  it("rejects payloads containing private tabs before persistence", async () => {
+    await expect(appRouter.createCaller(context()).sync.put({
+      baseRevision: 0,
+      payload: JSON.stringify({
+        version: 1,
+        tabs: [{ id: "private-tab", isPrivate: true, history: [{ url: "https://private.example" }] }],
+      }),
+    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(saveSnapshot).not.toHaveBeenCalled();
+  });
+
   it("requires authentication", async () => {
     await expect(appRouter.createCaller(context(null)).sync.get()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });

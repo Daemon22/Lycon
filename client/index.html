@@ -4,11 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#120f18" />
-    <meta name="description" content="Lycon — a local-first browsing workspace with deliberate online handoffs." />
+    <meta
+      name="description"
+      content="Lycon — a local-first browsing workspace with deliberate online handoffs."
+    />
     <link rel="icon" type="image/png" href="/assets/lycon-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>Lycon Browser — Local by Default</title>
   </head>
   <body>
@@ -17,27 +23,27 @@
     <!-- Umami analytics — only bootstrapped when endpoint + website id are configured.
          Guards against a blind request to /umami (404) in environments without analytics. -->
     <script>
-      (function () {
-        var endpoint = "%VITE_ANALYTICS_ENDPOINT%".trim();
-        var websiteId = "%VITE_ANALYTICS_WEBSITE_ID%".trim();
-        if (endpoint && websiteId) {
-          var umami = document.createElement("script");
-          umami.src = endpoint.replace(/\/+$/, "") + "/umami";
-          umami.defer = true;
-          umami.setAttribute("data-website-id", websiteId);
-          document.head.appendChild(umami);
+        (function () {
+          var endpoint = "%VITE_ANALYTICS_ENDPOINT%".trim();
+          var websiteId = "%VITE_ANALYTICS_WEBSITE_ID%".trim();
+          if (endpoint && websiteId) {
+            var umami = document.createElement("script");
+            umami.src = endpoint.replace(/\/+$/, "") + "/umami";
+            umami.defer = true;
+            umami.setAttribute("data-website-id", websiteId);
+            document.head.appendChild(umami);
+          }
+        })();
+      <script type="module">
+        const analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
+        const analyticsWebsiteId = "%VITE_ANALYTICS_WEBSITE_ID%";
+        if (analyticsEndpoint && analyticsWebsiteId) {
+          const analyticsScript = document.createElement("script");
+          analyticsScript.defer = true;
+          analyticsScript.src = `${analyticsEndpoint}/umami`;
+          analyticsScript.dataset.websiteId = analyticsWebsiteId;
+          document.body.appendChild(analyticsScript);
         }
-      })();
-    <script type="module">
-      const analyticsEndpoint = "%VITE_ANALYTICS_ENDPOINT%";
-      const analyticsWebsiteId = "%VITE_ANALYTICS_WEBSITE_ID%";
-      if (analyticsEndpoint && analyticsWebsiteId) {
-        const analyticsScript = document.createElement("script");
-        analyticsScript.defer = true;
-        analyticsScript.src = `${analyticsEndpoint}/umami`;
-        analyticsScript.dataset.websiteId = analyticsWebsiteId;
-        document.body.appendChild(analyticsScript);
-      }
     </script>
   </body>
 </html>

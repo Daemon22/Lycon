@@ -55,6 +55,8 @@ export interface EngineCapabilities {
   readonly canRunJavaScript: boolean;
   /** Can the engine manage cookies? */
   readonly canManageCookies: boolean;
+  /** Can the engine isolate private sessions from persistent site storage? */
+  readonly canIsolatePrivateSessions: boolean;
   /** Can the engine handle geolocation? */
   readonly canGeolocation: boolean;
   /** Can the engine handle media (microphone/camera)? */
@@ -312,6 +314,13 @@ export interface EngineAdapter {
    * and emit no further EngineEvents for this tabId.
    */
   detach(tabId: TabId): Promise<void>;
+
+  /**
+   * Unload the visible online document when the Core seals a tab's boundary.
+   * The adapter must not leave the current document able to continue making
+   * network requests after this operation resolves.
+   */
+  sealBoundary(tabId: TabId): Promise<void>;
 
   /**
    * Navigate the engine to a new URL.

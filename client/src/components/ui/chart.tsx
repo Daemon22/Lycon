@@ -117,25 +117,25 @@ function ChartTooltipContent({
   nameKey,
   labelKey,
 }: React.ComponentProps<"div"> & {
-    active?: boolean;
-    payload?: any[];
-    label?: React.ReactNode;
-    labelFormatter?: (label: React.ReactNode, payload: any[]) => React.ReactNode;
-    labelClassName?: string;
-    formatter?: (
-      value: any,
-      name: any,
-      props: any,
-      index: number,
-      payload: any
-    ) => React.ReactNode;
-    color?: string;
-    nameKey?: string;
-    labelKey?: string;
-    hideLabel?: boolean;
-    hideIndicator?: boolean;
-    indicator?: "line" | "dot" | "dashed";
-  }) {
+  active?: boolean;
+  payload?: any[];
+  label?: React.ReactNode;
+  labelFormatter?: (label: React.ReactNode, payload: any[]) => React.ReactNode;
+  labelClassName?: string;
+  formatter?: (
+    value: any,
+    name: any,
+    props: any,
+    index: number,
+    payload: any
+  ) => React.ReactNode;
+  color?: string;
+  nameKey?: string;
+  labelKey?: string;
+  hideLabel?: boolean;
+  hideIndicator?: boolean;
+  indicator?: "line" | "dot" | "dashed";
+}) {
   const { config } = useChart();
 
   const tooltipLabel = React.useMemo(() => {

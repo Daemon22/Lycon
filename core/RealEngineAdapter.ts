@@ -30,6 +30,23 @@ interface TabSurface {
   sandbox: string[];
 }
 
+interface TabEngineContext {
+  sessionMode: EngineContext['sessionMode'];
+  tabType: EngineContext['tabType'];
+}
+
+function isSupportedEngineUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:'
+      || url.protocol === 'https:'
+      || url.protocol === 'lycon:'
+      || (url.protocol === 'about:' && ['blank', 'start'].includes(url.pathname));
+  } catch {
+    return false;
+  }
+}
+
 export class RealEngineAdapter implements EngineAdapter {
   readonly capabilities: EngineCapabilities = {
     canRenderHtml: true,
@@ -41,6 +58,7 @@ export class RealEngineAdapter implements EngineAdapter {
     canAccessFile: true,
     canRunJavaScript: true,
     canManageCookies: true,
+    canIsolatePrivateSessions: false,
     canGeolocation: true,
     canMedia: true,
     canFullscreen: true,
@@ -58,6 +76,7 @@ export class RealEngineAdapter implements EngineAdapter {
    * via `bindContainer` — the adapter never reads browser globals to find it.
    */
   private surfaces = new Map<TabId, TabSurface>();
+  private contexts = new Map<TabId, TabEngineContext>();
 
   private currentUrl(tabId: TabId): string | null {
     const history = this.history.get(tabId);
@@ -90,7 +109,9 @@ export class RealEngineAdapter implements EngineAdapter {
     }
 
     const url = this.currentUrl(tabId);
-    if (url && /^https?:/i.test(url)) {
+    const context = this.contexts.get(tabId);
+    if (url && /^https?:/i.test(url)
+      && !(context?.sessionMode === 'private' && !this.capabilities.canIsolatePrivateSessions)) {
       iframe.setAttribute('src', url);
     } else {
       iframe.removeAttribute('src');
@@ -129,7 +150,15 @@ export class RealEngineAdapter implements EngineAdapter {
   }
 
   attach(context: EngineContext): Promise<void> {
+    if ((context.sessionMode === 'private') !== (context.tabType === 'private')) {
+      return Promise.reject(new Error('tab-type-session-mode-mismatch'));
+    }
+    if (context.sessionMode === 'private' && context.initialUrl && /^https?:/i.test(context.initialUrl)
+      && !this.capabilities.canIsolatePrivateSessions) {
+      return Promise.reject(new Error('private-engine-isolation-unavailable'));
+    }
     const tabId = context.tabId;
+    this.contexts.set(tabId, { sessionMode: context.sessionMode, tabType: context.tabType });
     this.zoom.set(tabId, 1);
     this.surfaces.set(tabId, {
       container: null,
@@ -166,6 +195,7 @@ export class RealEngineAdapter implements EngineAdapter {
   }
 
   detach(tabId: TabId): Promise<void> {
+    this.contexts.delete(tabId);
     this.history.delete(tabId);
     this.zoom.delete(tabId);
     const surface = this.surfaces.get(tabId);
@@ -181,7 +211,23 @@ export class RealEngineAdapter implements EngineAdapter {
     return Promise.resolve();
   }
 
+  sealBoundary(tabId: TabId): Promise<void> {
+    const iframe = this.surfaces.get(tabId)?.container?.querySelector('iframe');
+    if (iframe && iframe.getAttribute('src')?.match(/^https?:/i)) {
+      iframe.src = 'about:blank';
+    }
+    return Promise.resolve();
+  }
+
   navigate(request: EngineNavigationRequest): Promise<void> {
+    if (!isSupportedEngineUrl(request.url)) {
+      return Promise.reject(new Error('unsupported-engine-url-scheme'));
+    }
+    const context = this.contexts.get(request.tabId);
+    if (context?.sessionMode === 'private' && /^https?:/i.test(request.url)
+      && !this.capabilities.canIsolatePrivateSessions) {
+      return Promise.reject(new Error('private-engine-isolation-unavailable'));
+    }
     const history = this.ensureHistory(request.tabId, request.url);
     if (request.replace === true && history.urls.length > 0) {
       if (history.index >= 0) history.urls[history.index] = request.url;
@@ -216,6 +262,12 @@ export class RealEngineAdapter implements EngineAdapter {
   goBack(tabId: TabId): Promise<void> {
     const history = this.history.get(tabId);
     if (!history || history.index <= 0) return Promise.resolve();
+    const targetUrl = history.urls[history.index - 1];
+    const context = this.contexts.get(tabId);
+    if (context?.sessionMode === 'private' && /^https?:/i.test(targetUrl)
+      && !this.capabilities.canIsolatePrivateSessions) {
+      return Promise.reject(new Error('private-engine-isolation-unavailable'));
+    }
 
     history.index -= 1;
     const url = history.urls[history.index];
@@ -235,6 +287,12 @@ export class RealEngineAdapter implements EngineAdapter {
   goForward(tabId: TabId): Promise<void> {
     const history = this.history.get(tabId);
     if (!history || history.index >= history.urls.length - 1) return Promise.resolve();
+    const targetUrl = history.urls[history.index + 1];
+    const context = this.contexts.get(tabId);
+    if (context?.sessionMode === 'private' && /^https?:/i.test(targetUrl)
+      && !this.capabilities.canIsolatePrivateSessions) {
+      return Promise.reject(new Error('private-engine-isolation-unavailable'));
+    }
 
     history.index += 1;
     const url = history.urls[history.index];
@@ -252,6 +310,8 @@ export class RealEngineAdapter implements EngineAdapter {
   }
 
   stop(_tabId: TabId): Promise<void> {
+    const iframe = this.surfaces.get(_tabId)?.container?.querySelector('iframe');
+    iframe?.contentWindow?.stop();
     return Promise.resolve();
   }
 

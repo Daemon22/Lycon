@@ -136,6 +136,7 @@ Local data directory: `/data/data/com.lycon.browser/files/lycon-data/`
 ## Building an .apk / .aab
 
 ### Debug APK
+
 ```bash
 cd android
 ./gradlew :app:assembleDebug
@@ -143,6 +144,7 @@ cd android
 ```
 
 ### Release APK (unsigned)
+
 ```bash
 cd android
 ./gradlew :app:assembleRelease
@@ -150,6 +152,7 @@ cd android
 ```
 
 ### Android App Bundle (for Play Store)
+
 ```bash
 cd android
 ./gradlew :app:bundleRelease

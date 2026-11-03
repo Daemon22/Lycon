@@ -373,11 +373,16 @@ export class CapabilityResolver {
       }
     }
 
-    // Private session restrictions (Article V)
-    if (sessionMode === 'private') {
+    // Private session restrictions (Article V). Treat a private tab in a
+    // persistent session as private for capability resolution as a fail-safe;
+    // Core rejects the inconsistent object graph at tab creation.
+    if (sessionMode === 'private' || tabType === 'private') {
+      const reason = sessionMode === 'private'
+        ? 'private-session-restriction'
+        : 'inconsistent-tab-session-mode';
       for (const c of PRIVATE_SESSION_FORBIDDEN_CAPABILITIES) {
         if (caps.delete(c)) {
-          revoked.push({ capability: c, reason: 'private-session-restriction' });
+          revoked.push({ capability: c, reason });
         }
       }
     }
@@ -387,23 +392,6 @@ export class CapabilityResolver {
       for (const c of SEALED_BOUNDARY_REVOKED_CAPABILITIES) {
         if (caps.delete(c)) {
           revoked.push({ capability: c, reason: 'boundary-sealed' });
-        }
-      }
-    }
-
-    // Destroyed tab: no capabilities
-    if (tabType === 'private' && sessionMode !== 'private') {
-      // Inconsistent state — tab is private but session is persistent.
-      // This is a violation; revoke all persistence capabilities.
-      const persistenceCaps: Capability[] = [
-        'CanPersist',
-        'CanStoreLocalStorage',
-        'CanStoreIndexedDB',
-        'CanStoreCookies',
-      ];
-      for (const c of persistenceCaps) {
-        if (caps.delete(c)) {
-          revoked.push({ capability: c, reason: 'inconsistent-tab-session-mode' });
         }
       }
     }
